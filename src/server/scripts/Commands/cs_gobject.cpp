@@ -624,17 +624,8 @@ public:
         return true;
     }
 
-    static bool HandleGameObjectSetScaleCommand(ChatHandler* handler, char const* args)
+    static bool HandleGameObjectSetScaleCommand(ChatHandler* handler, GameObjectSpawnId guidLow, float scale)
     {
-        // number or [name] Shift-click form |color|Hgameobject:go_id|h[name]|h|r
-        char* id = handler->extractKeyFromLink((char*)args, "Hgameobject");
-        if (!id)
-            return false;
-
-        ObjectGuid::LowType guidLow = atoul(id);
-        if (!guidLow)
-            return false;
-
         GameObject* object = handler->GetObjectFromPlayerMapByDbGuid(guidLow);
         if (!object)
         {
@@ -642,16 +633,6 @@ public:
             handler->SetSentErrorMessage(true);
             return false;
         }
-
-        char* scale_temp = strtok(NULL, " ");
-        if (!scale_temp)
-        {
-            handler->SendSysMessage(LANG_BAD_VALUE);
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        float scale = atof(scale_temp);
 
         if (scale <= 0.0f)
         {

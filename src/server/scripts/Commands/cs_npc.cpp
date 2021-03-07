@@ -806,11 +806,8 @@ public:
         return true;
     }
 
-    static bool HandleNpcSetScaleCommand(ChatHandler* handler, const char* args)
+    static bool HandleNpcSetScaleCommand(ChatHandler* handler, float scale)
     {
-        if (!*args)
-            return false;
-
         Creature* creature = handler->getSelectedCreature();
         if (!creature)
         {
@@ -818,8 +815,6 @@ public:
             handler->SetSentErrorMessage(true);
             return false;
         }
-
-        float scale = (float)atof((char*)args);
 
         if (scale <= 0.0f)
         {
