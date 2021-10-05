@@ -108,6 +108,11 @@ TC_GAME_API extern DBCStorage <ChrRacesEntry>                sChrRacesStore;
 TC_GAME_API extern DBCStorage <CinematicCameraEntry>         sCinematicCameraStore;
 TC_GAME_API extern DBCStorage <CinematicSequencesEntry>      sCinematicSequencesStore;
 TC_GAME_API extern DBCStorage <CreatureDisplayInfoEntry>     sCreatureDisplayInfoStoreRaw;
+struct TC_GAME_API CreatureDisplayInfoStore
+{
+    const CreatureDisplayInfoEntry * AssertEntry(uint32 id) const;
+    const CreatureDisplayInfoEntry * LookupEntry(uint32 id) const;
+};
 TC_GAME_API extern CreatureDisplayInfoStore                  sCreatureDisplayInfoStore;
 TC_GAME_API extern DBCStorage <CreatureDisplayInfoExtraEntry> sCreatureDisplayInfoExtraStore;
 TC_GAME_API extern DBCStorage <CreatureFamilyEntry>          sCreatureFamilyStore;
