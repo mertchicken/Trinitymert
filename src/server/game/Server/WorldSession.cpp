@@ -318,14 +318,17 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                                 "Player is currently not in world yet.", GetOpcodeNameForLogging(static_cast<OpcodeClient>(packet->GetOpcode())).c_str());
                         }
                     }
-                    else if (_player->IsInWorld() && AntiDOS.EvaluateOpcode(*packet, currentTime))
+                    else if (_player->IsInWorld())
                     {
-                        sScriptMgr->OnPacketReceive(this, *packet);
-                        opHandle->Call(this, *packet);
-                        LogUnprocessedTail(packet);
+                        if(AntiDOS.EvaluateOpcode(*packet, currentTime))
+                        {
+                            sScriptMgr->OnPacketReceive(this, *packet);
+                            opHandle->Call(this, *packet);
+                            LogUnprocessedTail(packet);
+                        }
+                        else
+                            processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;   // break out of packet processing loop
                     }
-                    else
-                        processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;   // break out of packet processing loop
                     // lag can cause STATUS_LOGGEDIN opcodes to arrive after the player started a transfer
                     break;
                 case STATUS_LOGGEDIN_OR_RECENTLY_LOGGOUT:
@@ -1203,8 +1206,8 @@ void WorldSession::SendAddonsInfo()
     for (; itr != bannedAddons->end(); ++itr)
     {
         data << uint32(itr->Id);
-        data.append(itr->NameMD5, sizeof(itr->NameMD5));
-        data.append(itr->VersionMD5, sizeof(itr->VersionMD5));
+        data.append(itr->NameMD5);
+        data.append(itr->VersionMD5);
         data << uint32(itr->Timestamp);
         data << uint32(1);  // IsBanned
         bannedAddonCount++;
