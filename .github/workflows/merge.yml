@@ -83,7 +83,7 @@ jobs:
         repo: TrinityCore
         token: ${{ secrets.GITHUB_TOKEN }}
     - name: Download latest DB
-      uses: i3h/download-release-asset@6a9870c8f1c561f9e67550d6177c31c2b1c49fef
+      uses: i3h/download-release-asset@a987f9dc3559bd1024d7ed353b59c9d0bbb8ab61
       with:
         owner: TrinityCore
         repo: TrinityCore
@@ -210,7 +210,7 @@ jobs:
         repo: TrinityCore
         token: ${{ secrets.GITHUB_TOKEN }}
     - name: Download latest DB
-      uses: i3h/download-release-asset@6a9870c8f1c561f9e67550d6177c31c2b1c49fef
+      uses: i3h/download-release-asset@a987f9dc3559bd1024d7ed353b59c9d0bbb8ab61
       with:
         owner: TrinityCore
         repo: TrinityCore
