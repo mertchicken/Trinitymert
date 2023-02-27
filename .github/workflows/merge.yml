@@ -75,7 +75,7 @@ jobs:
         ./worldserver --version
     - name: Find latest DB release tag
       id: find_matching_tags
-      uses: Rochet2/find-matching-tags-ghapi@v1.1
+      uses: Rochet2/find-matching-tags-ghapi@v1.2
       with:
         regex: ^TDB\d{4,}\.\d+$
         sort: desc
@@ -202,7 +202,7 @@ jobs:
         ./worldserver --version
     - name: Find latest DB release tag
       id: find_matching_tags
-      uses: Rochet2/find-matching-tags-ghapi@v1.1
+      uses: Rochet2/find-matching-tags-ghapi@v1.2
       with:
         regex: ^TDB335\.\d+$
         sort: desc
