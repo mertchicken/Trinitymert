@@ -579,6 +579,11 @@ bool Creature::InitEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
     for (uint8 i = 0; i < MAX_CREATURE_SPELLS; ++i)
         m_spells[i] = GetCreatureTemplate()->spells[i];
 
+    _staticFlags.ApplyFlag(CREATURE_STATIC_FLAG_NO_XP, cinfo->type == CREATURE_TYPE_CRITTER
+        || IsPet()
+        || IsTotem()
+        || cinfo->flags_extra & CREATURE_FLAG_EXTRA_NO_XP);
+
     return true;
 }
 
@@ -1296,6 +1301,19 @@ bool Creature::CanResetTalents(Player* player) const
 {
     return player->GetLevel() >= 15
         && player->GetClass() == GetCreatureTemplate()->trainer_class;
+}
+
+uint32 Creature::GetLootId() const
+{
+    if (m_lootId)
+        return *m_lootId;
+
+    return GetCreatureTemplate()->lootid;
+}
+
+void Creature::SetLootId(Optional<uint32> lootId)
+{
+    m_lootId = lootId;
 }
 
 void Creature::SetTappedBy(Unit const* unit, bool withGroup)
@@ -3431,10 +3449,7 @@ void Creature::ClearTextRepeatGroup(uint8 textGroup)
 
 bool Creature::CanGiveExperience() const
 {
-    return !IsCritter()
-        && !IsPet()
-        && !IsTotem()
-        && !(GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP);
+    return !_staticFlags.HasFlag(CREATURE_STATIC_FLAG_NO_XP);
 }
 
 bool Creature::IsEngaged() const
