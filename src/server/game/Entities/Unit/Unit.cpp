@@ -5550,8 +5550,14 @@ bool Unit::Attack(Unit* victim, bool meleeAttack)
 
     Creature* creature = ToCreature();
     // creatures cannot attack while evading
-    if (creature && creature->IsInEvadeMode())
-        return false;
+    if (creature)
+    {
+        if (creature->IsInEvadeMode())
+            return false;
+
+        if (!creature->CanMelee())
+            meleeAttack = false;
+    }
 
     // nobody can attack GM in GM-mode
     if (victim->GetTypeId() == TYPEID_PLAYER)
@@ -10962,7 +10968,7 @@ void Unit::SetControlled(bool apply, UnitState state)
                 SetStunned(false);
                 break;
             case UNIT_STATE_ROOT:
-                if (HasAuraType(SPELL_AURA_MOD_ROOT) || HasAuraType(SPELL_AURA_MOD_ROOT_2) || HasAuraType(SPELL_AURA_MOD_ROOT_DISABLE_GRAVITY) || GetVehicle() || (ToCreature() && ToCreature()->GetMovementTemplate().IsRooted()))
+                if (HasAuraType(SPELL_AURA_MOD_ROOT) || HasAuraType(SPELL_AURA_MOD_ROOT_2) || HasAuraType(SPELL_AURA_MOD_ROOT_DISABLE_GRAVITY) || GetVehicle() || (ToCreature() && ToCreature()->IsTemplateRooted()))
                     return;
 
                 ClearUnitState(state);
@@ -12760,7 +12766,7 @@ bool Unit::SetDisableGravity(bool disable, bool updateAnimTier /*= true*/)
         SendMessageToSet(packet.Write(), true);
     }
 
-    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT) && !ToCreature()->GetMovementTemplate().IsRooted())
+    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT) && !ToCreature()->IsTemplateRooted())
     {
         if (IsGravityDisabled())
             SetAnimTier(AnimTier::Fly);
@@ -12976,7 +12982,7 @@ bool Unit::SetHover(bool enable, bool updateAnimTier /*= true*/)
         SendMessageToSet(packet.Write(), true);
     }
 
-    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT) && !ToCreature()->GetMovementTemplate().IsRooted())
+    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT) && !ToCreature()->IsTemplateRooted())
     {
         if (IsGravityDisabled())
             SetAnimTier(AnimTier::Fly);
