@@ -1530,12 +1530,10 @@ bool ConditionMgr::addToGossipMenus(Condition* cond) const
     {
         for (GossipMenusContainer::iterator itr = pMenuBounds.first; itr != pMenuBounds.second; ++itr)
         {
-            if ((*itr).second.MenuID == cond->SourceGroup && (*itr).second.TextID == uint32(cond->SourceEntry))
-            {
-                (*itr).second.Conditions.push_back(cond);
-                return true;
-            }
+            if (itr->second.MenuID == cond->SourceGroup && (itr->second.TextID == uint32(cond->SourceEntry) || cond->SourceEntry == 0))
+                itr->second.Conditions.push_back(cond);
         }
+        return true;
     }
 
     TC_LOG_ERROR("sql.sql", "{} GossipMenu {} not found.", cond->ToString(), cond->SourceGroup);
@@ -1713,7 +1711,7 @@ bool ConditionMgr::addToPhases(Condition* cond) const
         }
     }
 
-    TC_LOG_ERROR("sql.sql", "{} Area {} does not have phase {}.", cond->ToString(), cond->SourceGroup, cond->SourceEntry);
+    TC_LOG_ERROR("sql.sql", "{} Area {} does not have phase {}.", cond->ToString(), cond->SourceEntry, cond->SourceGroup);
     return false;
 }
 

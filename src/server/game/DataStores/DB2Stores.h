@@ -22,6 +22,7 @@
 #include "DB2Structure.h"
 #include "Optional.h"
 #include "SharedDefines.h"
+#include "advstd.h"
 #include <map>
 #include <set>
 #include <vector>
@@ -59,6 +60,7 @@ TC_GAME_API extern DB2Storage<AzeritePowerEntry>                    sAzeritePowe
 TC_GAME_API extern DB2Storage<BankBagSlotPricesEntry>               sBankBagSlotPricesStore;
 TC_GAME_API extern DB2Storage<BannedAddonsEntry>                    sBannedAddonsStore;
 TC_GAME_API extern DB2Storage<BarberShopStyleEntry>                 sBarberShopStyleStore;
+TC_GAME_API extern DB2Storage<BattlePetAbilityEntry>                sBattlePetAbilityStore;
 TC_GAME_API extern DB2Storage<BattlePetBreedQualityEntry>           sBattlePetBreedQualityStore;
 TC_GAME_API extern DB2Storage<BattlePetBreedStateEntry>             sBattlePetBreedStateStore;
 TC_GAME_API extern DB2Storage<BattlePetSpeciesEntry>                sBattlePetSpeciesStore;
@@ -333,10 +335,7 @@ public:
         int32 PushID = 0;
         uint32 UniqueID = 0;
 
-        friend bool operator<(HotfixId const& left, HotfixId const& right)
-        {
-            return std::tie(left.PushID, left.UniqueID) < std::tie(right.PushID, right.UniqueID);
-        }
+        friend std::strong_ordering operator<=>(HotfixId const& left, HotfixId const& right) = default;
     };
 
     struct HotfixRecord
@@ -355,9 +354,15 @@ public:
         HotfixId ID;
         Status HotfixStatus = Status::Invalid;
 
-        friend bool operator<(HotfixRecord const& left, HotfixRecord const& right)
+        friend std::strong_ordering operator<=>(HotfixRecord const& left, HotfixRecord const& right)
         {
-            return std::tie(left.ID, left.TableHash, left.RecordID) < std::tie(right.ID, right.TableHash, right.RecordID);
+            if (std::strong_ordering cmp = left.ID <=> right.ID; advstd::is_neq(cmp))
+                return cmp;
+            if (std::strong_ordering cmp = left.TableHash <=> right.TableHash; advstd::is_neq(cmp))
+                return cmp;
+            if (std::strong_ordering cmp = left.RecordID <=> right.RecordID; advstd::is_neq(cmp))
+                return cmp;
+            return std::strong_ordering::equal;
         }
     };
 

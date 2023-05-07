@@ -478,9 +478,7 @@ struct TC_GAME_API CreatureTemplate
     std::string  SubName;
     std::string  TitleAlt;
     std::string  IconName;
-    uint32  GossipMenuId;
-    int16   minlevel;
-    int16   maxlevel;
+    std::vector<uint32> GossipMenuIds;
     std::unordered_map<Difficulty, CreatureLevelScaling> scalingStore;
     int32   HealthScalingExpansion;
     uint32  RequiredExpansion;
@@ -517,7 +515,6 @@ struct TC_GAME_API CreatureTemplate
     std::string AIName;
     uint32  MovementType;
     CreatureMovementData Movement;
-    float   HoverHeight;
     float   ModHealth;
     float   ModHealthExtra;
     float   ModMana;
@@ -543,7 +540,6 @@ struct TC_GAME_API CreatureTemplate
     CreatureModel const* GetModelWithDisplayId(uint32 displayId) const;
     CreatureModel const* GetFirstInvisibleModel() const;
     CreatureModel const* GetFirstVisibleModel() const;
-    std::pair<int16, int16> GetMinMaxLevel() const;
     int32 GetHealthScalingExpansion() const;
     CreatureLevelScaling const* GetLevelScaling(Difficulty difficulty) const;
 
