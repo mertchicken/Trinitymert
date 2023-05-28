@@ -34,7 +34,7 @@ jobs:
       SQL_AUTH: ${{ join( matrix.auth, ' ' ) }}
       SQL_HOTFIX: ${{ join( matrix.hotfix, ' ' ) }}
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v3
@@ -156,7 +156,7 @@ jobs:
       SQL_CHAR: ${{ join( matrix.char, ' ' ) }}
       SQL_AUTH: ${{ join( matrix.auth, ' ' ) }}
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v3
