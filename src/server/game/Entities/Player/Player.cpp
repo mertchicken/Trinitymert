@@ -8082,6 +8082,7 @@ void Player::CastItemUseSpell(Item* item, SpellCastTargets const& targets, uint8
         }
 
         Spell* spell = new Spell(this, spellInfo, TRIGGERED_NONE);
+        spell->m_fromClient = true;
         spell->m_CastItem = item;
         spell->m_cast_count = cast_count;                   //set count of casts
         spell->SetSpellValue(SPELLVALUE_BASE_POINT0, learning_spell_id);
@@ -8110,6 +8111,7 @@ void Player::CastItemUseSpell(Item* item, SpellCastTargets const& targets, uint8
         }
 
         Spell* spell = new Spell(this, spellInfo, TRIGGERED_NONE);
+        spell->m_fromClient = true;
         spell->m_CastItem = item;
         spell->m_cast_count = cast_count;                   // set count of casts
         spell->m_glyphIndex = glyphIndex;                   // glyph index
@@ -8137,6 +8139,7 @@ void Player::CastItemUseSpell(Item* item, SpellCastTargets const& targets, uint8
             }
 
             Spell* spell = new Spell(this, spellInfo, TRIGGERED_NONE);
+            spell->m_fromClient = true;
             spell->m_CastItem = item;
             spell->m_cast_count = cast_count;               // set count of casts
             spell->m_glyphIndex = glyphIndex;               // glyph index
