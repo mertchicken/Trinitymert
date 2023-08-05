@@ -541,7 +541,7 @@ bool Creature::InitEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
 
     m_creatureInfo = creatureInfo;
     SetEntry(entry);
-    m_creatureDifficulty = creatureInfo->GetDifficulty(GetMap()->GetDifficultyID());
+    m_creatureDifficulty = creatureInfo->GetDifficulty(!IsPet() ? GetMap()->GetDifficultyID() : DIFFICULTY_NONE);
 
     // equal to player Race field, but creature does not have race
     SetRace(RACE_NONE);
@@ -604,6 +604,8 @@ bool Creature::InitEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
     for (uint8 i = 0; i < MAX_CREATURE_SPELLS; ++i)
         m_spells[i] = GetCreatureTemplate()->spells[i];
 
+    ApplyAllStaticFlags(m_creatureDifficulty->StaticFlags);
+
     _staticFlags.ApplyFlag(CREATURE_STATIC_FLAG_NO_XP, creatureInfo->type == CREATURE_TYPE_CRITTER
         || IsPet()
         || IsTotem()
@@ -630,8 +632,8 @@ bool Creature::UpdateEntry(uint32 entry, CreatureData const* data /*= nullptr*/,
     SetFaction(cInfo->faction);
 
     uint64 npcFlags;
-    uint32 unitFlags, unitFlags2, unitFlags3, dynamicFlags;
-    ObjectMgr::ChooseCreatureFlags(cInfo, &npcFlags, &unitFlags, &unitFlags2, &unitFlags3, &dynamicFlags, data);
+    uint32 unitFlags, unitFlags2, unitFlags3;
+    ObjectMgr::ChooseCreatureFlags(cInfo, &npcFlags, &unitFlags, &unitFlags2, &unitFlags3, data);
 
     if (cInfo->flags_extra & CREATURE_FLAG_EXTRA_WORLDEVENT)
         npcFlags |= sGameEventMgr->GetNPCFlag(this);
@@ -651,7 +653,7 @@ bool Creature::UpdateEntry(uint32 entry, CreatureData const* data /*= nullptr*/,
         SetMirrorImageFlag(true);
     ReplaceAllUnitFlags3(UnitFlags3(unitFlags3));
 
-    ReplaceAllDynamicFlags(dynamicFlags);
+    ReplaceAllDynamicFlags(UNIT_DYNFLAG_NONE);
 
     SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::StateAnimID), sDB2Manager.GetEmptyAnimStateID());
 
@@ -702,7 +704,7 @@ bool Creature::UpdateEntry(uint32 entry, CreatureData const* data /*= nullptr*/,
 
     // trigger creature is always uninteractible and can not be attacked
     if (IsTrigger())
-        SetUnitFlag(UNIT_FLAG_UNINTERACTIBLE);
+        SetUninteractible(true);
 
     InitializeReactState();
 
@@ -735,6 +737,14 @@ template<typename Derived, typename T, int32 BlockBit, uint32 Bit>
 static auto GetUpdateFieldHolderIndex(UF::UpdateField<T, BlockBit, Bit>(Derived::* /*field*/))
 {
     return Bit;
+}
+
+void Creature::ApplyAllStaticFlags(CreatureStaticFlagsHolder const& flags)
+{
+    _staticFlags = flags;
+
+    // Apply all other side effects of flag changes
+    SetTemplateRooted(flags.HasFlag(CREATURE_STATIC_FLAG_SESSILE));
 }
 
 void Creature::Update(uint32 diff)
@@ -1476,7 +1486,6 @@ void Creature::SaveToDB(uint32 mapid, std::vector<Difficulty> const& spawnDiffic
     uint32 unitFlags = m_unitData->Flags;
     uint32 unitFlags2 = m_unitData->Flags2;
     uint32 unitFlags3 = m_unitData->Flags3;
-    uint32 dynamicflags = m_objectData->DynamicFlags;
 
     // check if it's a custom model and if not, use 0 for displayId
     CreatureTemplate const* cinfo = GetCreatureTemplate();
@@ -1497,9 +1506,6 @@ void Creature::SaveToDB(uint32 mapid, std::vector<Difficulty> const& spawnDiffic
 
         if (unitFlags3 == cinfo->unit_flags3)
             unitFlags3 = 0;
-
-        if (dynamicflags == cinfo->dynamicflags)
-            dynamicflags = 0;
     }
 
     if (!data.spawnId)
@@ -1532,7 +1538,6 @@ void Creature::SaveToDB(uint32 mapid, std::vector<Difficulty> const& spawnDiffic
     data.unit_flags = unitFlags;
     data.unit_flags2 = unitFlags2;
     data.unit_flags3 = unitFlags3;
-    data.dynamicflags = dynamicflags;
     if (!data.spawnGroupData)
         data.spawnGroupData = sObjectMgr->GetDefaultSpawnGroup();
 
@@ -1584,7 +1589,6 @@ void Creature::SaveToDB(uint32 mapid, std::vector<Difficulty> const& spawnDiffic
     stmt->setUInt32(index++, unitFlags);
     stmt->setUInt32(index++, unitFlags2);
     stmt->setUInt32(index++, unitFlags3);
-    stmt->setUInt32(index++, dynamicflags);
     trans->Append(stmt);
 
     WorldDatabase.CommitTransaction(trans);
@@ -2283,8 +2287,8 @@ void Creature::setDeathState(DeathState s)
             CreatureTemplate const* cInfo = GetCreatureTemplate();
 
             uint64 npcFlags;
-            uint32 unitFlags, unitFlags2, unitFlags3, dynamicFlags;
-            ObjectMgr::ChooseCreatureFlags(cInfo, &npcFlags, &unitFlags, &unitFlags2, &unitFlags3, &dynamicFlags, creatureData);
+            uint32 unitFlags, unitFlags2, unitFlags3;
+            ObjectMgr::ChooseCreatureFlags(cInfo, &npcFlags, &unitFlags, &unitFlags2, &unitFlags3, creatureData);
 
             if (cInfo->flags_extra & CREATURE_FLAG_EXTRA_WORLDEVENT)
                 npcFlags |= sGameEventMgr->GetNPCFlag(this);
@@ -2295,7 +2299,7 @@ void Creature::setDeathState(DeathState s)
             ReplaceAllUnitFlags(UnitFlags(unitFlags));
             ReplaceAllUnitFlags2(UnitFlags2(unitFlags2));
             ReplaceAllUnitFlags3(UnitFlags3(unitFlags3));
-            ReplaceAllDynamicFlags(dynamicFlags);
+            ReplaceAllDynamicFlags(UNIT_DYNFLAG_NONE);
 
             RemoveUnitFlag(UNIT_FLAG_IN_COMBAT);
 
@@ -2606,7 +2610,7 @@ bool Creature::CanAssistTo(Unit const* u, Unit const* enemy, bool checkfaction /
     if (IsCivilian())
         return false;
 
-    if (HasUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_UNINTERACTIBLE) || IsImmuneToNPC())
+    if (HasUnitFlag(UNIT_FLAG_NON_ATTACKABLE) || IsImmuneToNPC() || IsUninteractible())
         return false;
 
     // skip fighting creature
@@ -3014,7 +3018,7 @@ uint64 Creature::GetMaxHealthByLevel(uint8 level) const
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate();
     CreatureDifficulty const* creatureDifficulty = GetCreatureDifficulty();
-    float baseHealth = sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureHealth, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class));
+    float baseHealth = sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureHealth, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class), 0);
     return std::max(baseHealth * creatureDifficulty->HealthModifier, 1.0f);
 }
 
@@ -3034,7 +3038,7 @@ float Creature::GetBaseDamageForLevel(uint8 level) const
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate();
     CreatureDifficulty const* creatureDifficulty = GetCreatureDifficulty();
-    return sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureAutoAttackDps, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class));
+    return sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureAutoAttackDps, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class), 0);
 }
 
 float Creature::GetDamageMultiplierForTarget(WorldObject const* target) const
@@ -3051,7 +3055,7 @@ float Creature::GetBaseArmorForLevel(uint8 level) const
 {
     CreatureTemplate const* cInfo = GetCreatureTemplate();
     CreatureDifficulty const* creatureDifficulty = GetCreatureDifficulty();
-    float baseArmor = sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureArmor, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class));
+    float baseArmor = sDB2Manager.EvaluateExpectedStat(ExpectedStatType::CreatureArmor, level, creatureDifficulty->GetHealthScalingExpansion(), creatureDifficulty->ContentTuningID, Classes(cInfo->unit_class), 0);
     return baseArmor * creatureDifficulty->ArmorModifier;
 }
 
@@ -3453,7 +3457,7 @@ void Creature::SetSpellFocus(Spell const* focusSpell, WorldObject const* target)
     _spellFocusInfo.Spell = focusSpell;
 
     bool const noTurnDuringCast = spellInfo->HasAttribute(SPELL_ATTR5_AI_DOESNT_FACE_TARGET);
-    bool const turnDisabled = HasUnitFlag2(UNIT_FLAG2_CANNOT_TURN);
+    bool const turnDisabled = CannotTurn();
     // set target, then force send update packet to players if it changed to provide appropriate facing
     ObjectGuid newTarget = (target && !noTurnDuringCast && !turnDisabled) ? target->GetGUID() : ObjectGuid::Empty;
     if (GetTarget() != newTarget)
@@ -3499,7 +3503,7 @@ void Creature::ReleaseSpellFocus(Spell const* focusSpell, bool withDelay)
 
     if (IsPet()) // player pets do not use delay system
     {
-        if (!HasUnitFlag2(UNIT_FLAG2_CANNOT_TURN))
+        if (!CannotTurn())
             ReacquireSpellFocusTarget();
     }
     else // don't allow re-target right away to prevent visual bugs
@@ -3518,7 +3522,7 @@ void Creature::ReacquireSpellFocusTarget()
 
     SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::Target), _spellFocusInfo.Target);
 
-    if (!HasUnitFlag2(UNIT_FLAG2_CANNOT_TURN))
+    if (!CannotTurn())
     {
         if (!_spellFocusInfo.Target.IsEmpty())
         {
@@ -3638,7 +3642,7 @@ void Creature::AtDisengage()
 
     ClearUnitState(UNIT_STATE_ATTACK_PLAYER);
     if (IsAlive() && HasDynamicFlag(UNIT_DYNFLAG_TAPPED))
-        ReplaceAllDynamicFlags(GetCreatureTemplate()->dynamicflags);
+        RemoveDynamicFlag(UNIT_DYNFLAG_TAPPED);
 
     if (IsPet() || IsGuardian()) // update pets' speed for catchup OOC speed
     {

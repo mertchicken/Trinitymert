@@ -39,6 +39,7 @@
 #include "GuildMgr.h"
 #include "InstanceScript.h"
 #include "Item.h"
+#include "ItemBonusMgr.h"
 #include "Language.h"
 #include "LFGMgr.h"
 #include "Log.h"
@@ -362,17 +363,17 @@ void ObjectMgr::LoadCreatureTemplates()
     //                                       "TitleAlt, IconName, RequiredExpansion, VignetteID, "
     //                                        10       11       12          13         14      15     16         17              18               19            20
     //                                       "faction, npcflag, speed_walk, speed_run, scale, `rank`, dmgschool, BaseAttackTime, RangeAttackTime, BaseVariance, RangeVariance, "
-    //                                        21          22          23           24           25            26      27             28
-    //                                       "unit_class, unit_flags, unit_flags2, unit_flags3, dynamicflags, family, trainer_class, type, "
-    //                                        29      30         31
-    //                                       "VehicleId, AIName, MovementType, "
-    //                                        32          33        34          35          36         38          38                         39
+    //                                        21          22          23           24
+    //                                       "unit_class, unit_flags, unit_flags2, unit_flags3, "
+    //                                        25      26             27    28         29      30
+    //                                       "family, trainer_class, type, VehicleId, AIName, MovementType, "
+    //                                        31          32        33          34          35         36          37                         38
     //                                       "ctm.Ground, ctm.Swim, ctm.Flight, ctm.Rooted, ctm.Chase, ctm.Random, ctm.InteractionPauseTimer, ExperienceModifier, "
-    //                                        40            41          42           43                        44
+    //                                        39            40          41           42                        43
     //                                       "RacialLeader, movementId, WidgetSetID, WidgetSetUnitConditionID, RegenHealth, "
-    //                                        45                    46                        47
+    //                                        44                    45                        46
     //                                       "mechanic_immune_mask, spell_school_immune_mask, flags_extra, "
-    //                                        48          49
+    //                                        47          48
     //                                       "ScriptName, StringId FROM creature_template WHERE entry = ? OR 1 = ?");
 
     WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_CREATURE_TEMPLATE);
@@ -440,10 +441,9 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.unit_flags             = fields[22].GetUInt32();
     creatureTemplate.unit_flags2            = fields[23].GetUInt32();
     creatureTemplate.unit_flags3            = fields[24].GetUInt32();
-    creatureTemplate.dynamicflags           = fields[25].GetUInt32();
-    creatureTemplate.family                 = CreatureFamily(fields[26].GetInt32());
-    creatureTemplate.trainer_class          = uint32(fields[27].GetUInt8());
-    creatureTemplate.type                   = uint32(fields[28].GetUInt8());
+    creatureTemplate.family                 = CreatureFamily(fields[25].GetInt32());
+    creatureTemplate.trainer_class          = uint32(fields[26].GetUInt8());
+    creatureTemplate.type                   = uint32(fields[27].GetUInt8());
 
     for (uint8 i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
         creatureTemplate.resistance[i] = 0;
@@ -451,41 +451,41 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     for (uint8 i = 0; i < MAX_CREATURE_SPELLS; ++i)
         creatureTemplate.spells[i] = 0;
 
-    creatureTemplate.VehicleId              = fields[29].GetUInt32();
-    creatureTemplate.AIName                 = fields[30].GetString();
-    creatureTemplate.MovementType           = uint32(fields[31].GetUInt8());
+    creatureTemplate.VehicleId              = fields[28].GetUInt32();
+    creatureTemplate.AIName                 = fields[29].GetString();
+    creatureTemplate.MovementType           = uint32(fields[30].GetUInt8());
+    if (!fields[31].IsNull())
+        creatureTemplate.Movement.Ground = static_cast<CreatureGroundMovementType>(fields[31].GetUInt8());
+
     if (!fields[32].IsNull())
-        creatureTemplate.Movement.Ground = static_cast<CreatureGroundMovementType>(fields[32].GetUInt8());
+        creatureTemplate.Movement.Swim = fields[32].GetBool();
 
     if (!fields[33].IsNull())
-        creatureTemplate.Movement.Swim = fields[33].GetBool();
+        creatureTemplate.Movement.Flight = static_cast<CreatureFlightMovementType>(fields[33].GetUInt8());
 
     if (!fields[34].IsNull())
-        creatureTemplate.Movement.Flight = static_cast<CreatureFlightMovementType>(fields[34].GetUInt8());
+        creatureTemplate.Movement.Rooted = fields[34].GetBool();
 
     if (!fields[35].IsNull())
-        creatureTemplate.Movement.Rooted = fields[35].GetBool();
+        creatureTemplate.Movement.Chase = static_cast<CreatureChaseMovementType>(fields[35].GetUInt8());
 
     if (!fields[36].IsNull())
-        creatureTemplate.Movement.Chase = static_cast<CreatureChaseMovementType>(fields[36].GetUInt8());
+        creatureTemplate.Movement.Random = static_cast<CreatureRandomMovementType>(fields[36].GetUInt8());
 
     if (!fields[37].IsNull())
-        creatureTemplate.Movement.Random = static_cast<CreatureRandomMovementType>(fields[37].GetUInt8());
+        creatureTemplate.Movement.InteractionPauseTimer = fields[37].GetUInt32();
 
-    if (!fields[38].IsNull())
-        creatureTemplate.Movement.InteractionPauseTimer = fields[38].GetUInt32();
-
-    creatureTemplate.ModExperience          = fields[39].GetFloat();
-    creatureTemplate.RacialLeader           = fields[40].GetBool();
-    creatureTemplate.movementId             = fields[41].GetUInt32();
-    creatureTemplate.WidgetSetID            = fields[42].GetInt32();
-    creatureTemplate.WidgetSetUnitConditionID = fields[43].GetInt32();
-    creatureTemplate.RegenHealth            = fields[44].GetBool();
-    creatureTemplate.MechanicImmuneMask     = fields[45].GetUInt64();
-    creatureTemplate.SpellSchoolImmuneMask  = fields[46].GetUInt32();
-    creatureTemplate.flags_extra            = fields[47].GetUInt32();
-    creatureTemplate.ScriptID               = GetScriptId(fields[48].GetString());
-    creatureTemplate.StringId               = fields[49].GetString();
+    creatureTemplate.ModExperience          = fields[38].GetFloat();
+    creatureTemplate.RacialLeader           = fields[39].GetBool();
+    creatureTemplate.movementId             = fields[40].GetUInt32();
+    creatureTemplate.WidgetSetID            = fields[41].GetInt32();
+    creatureTemplate.WidgetSetUnitConditionID = fields[42].GetInt32();
+    creatureTemplate.RegenHealth            = fields[43].GetBool();
+    creatureTemplate.MechanicImmuneMask     = fields[44].GetUInt64();
+    creatureTemplate.SpellSchoolImmuneMask  = fields[45].GetUInt32();
+    creatureTemplate.flags_extra            = fields[46].GetUInt32();
+    creatureTemplate.ScriptID               = GetScriptId(fields[47].GetString());
+    creatureTemplate.StringId               = fields[48].GetString();
 }
 
 void ObjectMgr::LoadCreatureTemplateGossip()
@@ -902,13 +902,13 @@ void ObjectMgr::LoadCreatureTemplateSparring()
 
         if (!sObjectMgr->GetCreatureTemplate(entry))
         {
-            TC_LOG_ERROR("sql.sql", "Creature template (Entry: %u) does not exist but has a record in `creature_template_sparring`", entry);
+            TC_LOG_ERROR("sql.sql", "Creature template (Entry: {}) does not exist but has a record in `creature_template_sparring`", entry);
             continue;
         }
 
         if (noNPCDamageBelowHealthPct <= 0 || noNPCDamageBelowHealthPct > 100)
         {
-            TC_LOG_ERROR("sql.sql", "Creature (Entry: %u) has invalid NoNPCDamageBelowHealthPct (%f) defined in `creature_template_sparring`. Skipping",
+            TC_LOG_ERROR("sql.sql", "Creature (Entry: {}) has invalid NoNPCDamageBelowHealthPct (%f) defined in `creature_template_sparring`. Skipping",
                 entry, noNPCDamageBelowHealthPct);
             continue;
         }
@@ -917,15 +917,22 @@ void ObjectMgr::LoadCreatureTemplateSparring()
         ++count;
     } while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u creature template sparring rows in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded {} creature template sparring rows in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadCreatureTemplateDifficulty()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                               0      1             2                     3                     4                5                       6               7             8              9               10                    11         12          13      14                15          16       17
-    QueryResult result = WorldDatabase.Query("SELECT Entry, DifficultyID, LevelScalingDeltaMin, LevelScalingDeltaMax, ContentTuningID, HealthScalingExpansion, HealthModifier, ManaModifier, ArmorModifier, DamageModifier, CreatureDifficultyID, TypeFlags, TypeFlags2, LootID, PickPocketLootID, SkinLootID, GoldMin, GoldMax FROM creature_template_difficulty ORDER BY Entry");
+    //                                               0      1             2                     3                     4                5
+    QueryResult result = WorldDatabase.Query("SELECT Entry, DifficultyID, LevelScalingDeltaMin, LevelScalingDeltaMax, ContentTuningID, HealthScalingExpansion, "
+    //   6               7             8              9               10                    11         12
+        "HealthModifier, ManaModifier, ArmorModifier, DamageModifier, CreatureDifficultyID, TypeFlags, TypeFlags2, "
+    //   13      14                15          16       17
+        "LootID, PickPocketLootID, SkinLootID, GoldMin, GoldMax,"
+    //   18            19            20            21            22            23            24            25
+        "StaticFlags1, StaticFlags2, StaticFlags3, StaticFlags4, StaticFlags5, StaticFlags6, StaticFlags7, StaticFlags8 "
+        "FROM creature_template_difficulty ORDER BY Entry");
 
     if (!result)
     {
@@ -965,6 +972,9 @@ void ObjectMgr::LoadCreatureTemplateDifficulty()
         creatureDifficulty.SkinLootID             = fields[15].GetUInt32();
         creatureDifficulty.GoldMin                = fields[16].GetUInt32();
         creatureDifficulty.GoldMax                = fields[17].GetUInt32();
+        creatureDifficulty.StaticFlags            = CreatureStaticFlagsHolder(CreatureStaticFlags(fields[18].GetUInt32()), CreatureStaticFlags2(fields[19].GetUInt32()),
+            CreatureStaticFlags3(fields[20].GetUInt32()), CreatureStaticFlags4(fields[21].GetUInt32()), CreatureStaticFlags5(fields[22].GetUInt32()),
+            CreatureStaticFlags6(fields[23].GetUInt32()), CreatureStaticFlags7(fields[24].GetUInt32()),  CreatureStaticFlags8(fields[25].GetUInt32()));
 
         // TODO: Check if this still applies
         creatureDifficulty.DamageModifier *= Creature::_GetDamageMod(itr->second.rank);
@@ -1134,12 +1144,6 @@ void ObjectMgr::CheckCreatureTemplate(CreatureTemplate const* cInfo)
     {
         TC_LOG_ERROR("sql.sql", "Table `creature_template` lists creature (Entry: {}) with disallowed `unit_flags2` {}, removing incorrect flag.", cInfo->Entry, disallowedUnitFlags3);
         const_cast<CreatureTemplate*>(cInfo)->unit_flags3 &= UNIT_FLAG3_ALLOWED;
-    }
-
-    if (cInfo->dynamicflags)
-    {
-        TC_LOG_ERROR("sql.sql", "Table `creature_template` lists creature (Entry: {}) with `dynamicflags` > 0. Ignored and set to 0.", cInfo->Entry);
-        const_cast<CreatureTemplate*>(cInfo)->dynamicflags = 0;
     }
 
     if (!cInfo->GossipMenuIds.empty() && !(cInfo->npcflag & UNIT_NPC_FLAG_GOSSIP))
@@ -1640,7 +1644,7 @@ CreatureModel const* ObjectMgr::ChooseDisplayId(CreatureTemplate const* cinfo, C
     return cinfo->GetFirstInvisibleModel();
 }
 
-void ObjectMgr::ChooseCreatureFlags(CreatureTemplate const* cInfo, uint64* npcFlags, uint32* unitFlags, uint32* unitFlags2, uint32* unitFlags3, uint32* dynamicFlags, CreatureData const* data /*= nullptr*/)
+void ObjectMgr::ChooseCreatureFlags(CreatureTemplate const* cInfo, uint64* npcFlags, uint32* unitFlags, uint32* unitFlags2, uint32* unitFlags3, CreatureData const* data /*= nullptr*/)
 {
 #define ChooseCreatureFlagSource(field) ((data && data->field) ? data->field : cInfo->field)
 
@@ -1655,9 +1659,6 @@ void ObjectMgr::ChooseCreatureFlags(CreatureTemplate const* cInfo, uint64* npcFl
 
     if (unitFlags3)
         *unitFlags3 = ChooseCreatureFlagSource(unit_flags3);
-
-    if (dynamicFlags)
-        *dynamicFlags = ChooseCreatureFlagSource(dynamicflags);
 
 #undef ChooseCreatureFlagSource
 }
@@ -2135,8 +2136,8 @@ void ObjectMgr::LoadCreatures()
     QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, position_x, position_y, position_z, orientation, modelid, equipment_id, spawntimesecs, wander_distance, "
     //   11               12         13       14            15                 16          17           18                19                   20                    21
         "currentwaypoint, curhealth, curmana, MovementType, spawnDifficulties, eventEntry, poolSpawnId, creature.npcflag, creature.unit_flags, creature.unit_flags2, creature.unit_flags3, "
-    //   22                     23                      24                25                   26                       27                   28
-        "creature.dynamicflags, creature.phaseUseFlags, creature.phaseid, creature.phasegroup, creature.terrainSwapMap, creature.ScriptName, creature.StringId "
+    //   22                      23                24                   25                       26                   27
+        "creature.phaseUseFlags, creature.phaseid, creature.phasegroup, creature.terrainSwapMap, creature.ScriptName, creature.StringId "
         "FROM creature "
         "LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid "
         "LEFT OUTER JOIN pool_members ON pool_members.type = 0 AND creature.guid = pool_members.spawnId");
@@ -2190,13 +2191,12 @@ void ObjectMgr::LoadCreatures()
         data.unit_flags     = fields[19].GetUInt32();
         data.unit_flags2    = fields[20].GetUInt32();
         data.unit_flags3    = fields[21].GetUInt32();
-        data.dynamicflags   = fields[22].GetUInt32();
-        data.phaseUseFlags  = fields[23].GetUInt8();
-        data.phaseId        = fields[24].GetUInt32();
-        data.phaseGroup     = fields[25].GetUInt32();
-        data.terrainSwapMap = fields[26].GetInt32();
-        data.scriptId       = GetScriptId(fields[27].GetString());
-        data.StringId       = fields[28].GetString();
+        data.phaseUseFlags  = fields[22].GetUInt8();
+        data.phaseId        = fields[23].GetUInt32();
+        data.phaseGroup     = fields[24].GetUInt32();
+        data.terrainSwapMap = fields[25].GetInt32();
+        data.scriptId       = GetScriptId(fields[26].GetString());
+        data.StringId       = fields[27].GetString();
         data.spawnGroupData = IsTransportMap(data.mapId) ? GetLegacySpawnGroup() : GetDefaultSpawnGroup(); // transport spawns default to compatibility group
 
         MapEntry const* mapEntry = sMapStore.LookupEntry(data.mapId);
@@ -2344,12 +2344,6 @@ void ObjectMgr::LoadCreatures()
             data.unit_flags3 &= UNIT_FLAG3_ALLOWED;
         }
 
-        if (data.dynamicflags)
-        {
-            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: {} Entry: {}) with `dynamicflags` > 0. Ignored and set to 0.", guid, data.id);
-            data.dynamicflags = 0;
-        }
-
         if (sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA))
         {
             uint32 zoneId = 0;
@@ -2440,8 +2434,8 @@ void ObjectMgr::LoadGameObjects()
     QueryResult result = WorldDatabase.Query("SELECT gameobject.guid, id, map, position_x, position_y, position_z, orientation, "
     //   7          8          9          10         11             12            13     14                 15          16
         "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnDifficulties, eventEntry, poolSpawnId, "
-    //   17             18       19          20              21
-        "phaseUseFlags, phaseid, phasegroup, terrainSwapMap, ScriptName "
+    //   17             18       19          20              21          22
+        "phaseUseFlags, phaseid, phasegroup, terrainSwapMap, ScriptName, StringId "
         "FROM gameobject LEFT OUTER JOIN game_event_gameobject ON gameobject.guid = game_event_gameobject.guid "
         "LEFT OUTER JOIN pool_members ON pool_members.type = 1 AND gameobject.guid = pool_members.spawnId");
 
@@ -2617,6 +2611,7 @@ void ObjectMgr::LoadGameObjects()
         }
 
         data.scriptId = GetScriptId(fields[21].GetString());
+        data.StringId = fields[22].GetString();
 
         if (data.rotation.x < -1.0f || data.rotation.x > 1.0f)
         {
@@ -5842,24 +5837,26 @@ void ObjectMgr::LoadSpellScripts()
     }
 }
 
-void ObjectMgr::LoadEventScripts()
+void ObjectMgr::LoadEventSet()
 {
-    LoadScripts(SCRIPTS_EVENT);
+    _eventStore.clear();
 
-    std::set<uint32> evt_scripts;
-    // Load all possible script entries from gameobjects
+    // Load all possible event ids from gameobjects
     for (auto const& gameObjectTemplatePair : _gameObjectTemplateStore)
-        if (uint32 eventId = gameObjectTemplatePair.second.GetEventScriptId())
-            evt_scripts.insert(eventId);
+    {
+        EventContainer eventSet = gameObjectTemplatePair.second.GetEventScriptSet();
+        _eventStore.insert(eventSet.begin(), eventSet.end());
+    }
 
-    // Load all possible script entries from spells
+    // Load all possible event ids from spells
     for (SpellNameEntry const* spellNameEntry : sSpellNameStore)
         if (SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellNameEntry->ID, DIFFICULTY_NONE))
             for (SpellEffectInfo const& spellEffectInfo : spell->GetEffects())
                 if (spellEffectInfo.IsEffect(SPELL_EFFECT_SEND_EVENT))
                     if (spellEffectInfo.MiscValue)
-                        evt_scripts.insert(spellEffectInfo.MiscValue);
+                        _eventStore.insert(spellEffectInfo.MiscValue);
 
+    // Load all possible event ids from taxi path nodes
     for (size_t path_idx = 0; path_idx < sTaxiPathNodesByPath.size(); ++path_idx)
     {
         for (size_t node_idx = 0; node_idx < sTaxiPathNodesByPath[path_idx].size(); ++node_idx)
@@ -5867,21 +5864,58 @@ void ObjectMgr::LoadEventScripts()
             TaxiPathNodeEntry const* node = sTaxiPathNodesByPath[path_idx][node_idx];
 
             if (node->ArrivalEventID)
-                evt_scripts.insert(node->ArrivalEventID);
+                _eventStore.insert(node->ArrivalEventID);
 
             if (node->DepartureEventID)
-                evt_scripts.insert(node->DepartureEventID);
+                _eventStore.insert(node->DepartureEventID);
         }
     }
+}
+
+void ObjectMgr::LoadEventScripts()
+{
+    // Set of valid events referenced in several sources
+    LoadEventSet();
+
+    // Deprecated
+    LoadScripts(SCRIPTS_EVENT);
 
     // Then check if all scripts are in above list of possible script entries
     for (ScriptMapMap::const_iterator itr = sEventScripts.begin(); itr != sEventScripts.end(); ++itr)
     {
-        std::set<uint32>::const_iterator itr2 = evt_scripts.find(itr->first);
-        if (itr2 == evt_scripts.end())
-            TC_LOG_ERROR("sql.sql", "Table `event_scripts` has script (Id: {}) not referring to any gameobject_template type 10 data2 field, type 3 data6 field, type 13 data 2 field or any spell effect {}",
+        if (!IsValidEvent(itr->first))
+            TC_LOG_ERROR("sql.sql", "Table `event_scripts` has script (Id: {}) not referring to any gameobject_template (data field referencing GameEvent), any taxi path node or any spell effect {}",
                 itr->first, SPELL_EFFECT_SEND_EVENT);
     }
+
+    uint32 oldMSTime = getMSTime();
+
+    _eventScriptStore.clear(); // Reload case
+
+    QueryResult result = WorldDatabase.Query("SELECT Id, ScriptName FROM event_script_names");
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 event scripts. DB table `event_script_names` is empty.");
+        return;
+    }
+
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 eventId = fields[0].GetUInt32();
+        std::string const scriptName = fields[1].GetString();
+
+        if (!IsValidEvent(eventId))
+        {
+            TC_LOG_ERROR("sql.sql", "Event (ID: {}) not referring to any gameobject_template (data field referencing GameEvent), any taxi path node or any spell effect {}",
+                eventId, SPELL_EFFECT_SEND_EVENT);
+            continue;
+        }
+        _eventScriptStore[eventId] = GetScriptId(scriptName);
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded {} event scripts in {} ms", _eventScriptStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
 //Load WP Scripts
@@ -6015,7 +6049,7 @@ void ObjectMgr::ValidateSpellScripts()
 
             if (spellScript)
             {
-                spellScript->_Init(&spellScriptLoader->GetName(), spellEntry->Id);
+                spellScript->_Init(spellScriptLoader->GetName(), spellEntry->Id);
                 spellScript->_Register();
 
                 if (!spellScript->_Validate(spellEntry))
@@ -6027,7 +6061,7 @@ void ObjectMgr::ValidateSpellScripts()
 
             if (auraScript)
             {
-                auraScript->_Init(&spellScriptLoader->GetName(), spellEntry->Id);
+                auraScript->_Init(spellScriptLoader->GetName(), spellEntry->Id);
                 auraScript->_Register();
 
                 if (!auraScript->_Validate(spellEntry))
@@ -7584,8 +7618,8 @@ void ObjectMgr::LoadGameObjectTemplate()
                                              "Data0, Data1, Data2, Data3, Data4, Data5, Data6, Data7, Data8, Data9, Data10, Data11, Data12, "
     //                                        21      22      23      24      25      26      27      28      29      30      31      32      33      34      35      36
                                              "Data13, Data14, Data15, Data16, Data17, Data18, Data19, Data20, Data21, Data22, Data23, Data24, Data25, Data26, Data27, Data28, "
-    //                                        37      38       39     40      41      42      43               44      45
-                                             "Data29, Data30, Data31, Data32, Data33, Data34, ContentTuningId, AIName, ScriptName "
+    //                                        37      38       39     40      41      42      43               44      45          46
+                                             "Data29, Data30, Data31, Data32, Data33, Data34, ContentTuningId, AIName, ScriptName, StringId "
                                              "FROM gameobject_template");
 
     if (!result)
@@ -7617,6 +7651,7 @@ void ObjectMgr::LoadGameObjectTemplate()
         got.ContentTuningId = fields[43].GetInt32();
         got.AIName = fields[44].GetString();
         got.ScriptId = GetScriptId(fields[45].GetString());
+        got.StringId = fields[46].GetString();
 
         // Checks
         if (!got.AIName.empty() && !sGameObjectAIRegistry->HasItem(got.AIName))
@@ -8992,6 +9027,14 @@ SpellScriptsBounds ObjectMgr::GetSpellScriptsBounds(uint32 spellId)
     return SpellScriptsBounds(_spellScriptsStore.equal_range(spellId));
 }
 
+uint32 ObjectMgr::GetEventScriptId(uint32 eventId) const
+{
+    EventScriptContainer::const_iterator i = _eventScriptStore.find(eventId);
+    if (i != _eventScriptStore.end())
+        return i->second;
+    return 0;
+}
+
 // this allows calculating base reputations to offline players, just by race and class
 int32 ObjectMgr::GetBaseReputationOf(FactionEntry const* factionEntry, uint8 race, uint8 playerClass) const
 {
@@ -10122,11 +10165,11 @@ bool ObjectMgr::IsVendorItemValid(uint32 vendor_entry, VendorItem const& vItem, 
             return false;
         }
 
-        for (int32 bonusList : vItem.BonusListIDs)
+        for (int32 bonusListId : vItem.BonusListIDs)
         {
-            if (!sDB2Manager.GetItemBonusList(bonusList))
+            if (ItemBonusMgr::GetItemBonuses(bonusListId).empty())
             {
-                TC_LOG_ERROR("sql.sql", "Table `(game_event_)npc_vendor` have Item (Entry: {}) with invalid bonus {} for vendor ({}), ignore", vItem.item, bonusList, vendor_entry);
+                TC_LOG_ERROR("sql.sql", "Table `(game_event_)npc_vendor` have Item (Entry: {}) with invalid bonus {} for vendor ({}), ignore", vItem.item, bonusListId, vendor_entry);
                 return false;
             }
         }
