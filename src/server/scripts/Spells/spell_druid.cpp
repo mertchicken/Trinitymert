@@ -26,7 +26,7 @@
 #include "Containers.h"
 #include "DB2Stores.h"
 #include "GridNotifiersImpl.h"
-#include "PassiveAI.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
@@ -64,6 +64,8 @@ enum DruidSpells
     SPELL_DRUID_ECLIPSE_SOLAR_SPELL_CNT        = 326053,
     SPELL_DRUID_EFFLORESCENCE_AURA             = 81262,
     SPELL_DRUID_EFFLORESCENCE_HEAL             = 81269,
+    SPELL_DRUID_EMBRACE_OF_THE_DREAM_EFFECT    = 392146,
+    SPELL_DRUID_EMBRACE_OF_THE_DREAM_HEAL      = 392147,
     SPELL_DRUID_ENTANGLING_ROOTS               = 339,
     SPELL_DRUID_EXHILARATE                     = 28742,
     SPELL_DRUID_FORM_AQUATIC_PASSIVE           = 276012,
@@ -87,6 +89,7 @@ enum DruidSpells
     SPELL_DRUID_INCARNATION                    = 117679,
     SPELL_DRUID_INCARNATION_KING_OF_THE_JUNGLE = 102543,
     SPELL_DRUID_INCARNATION_TREE_OF_LIFE       = 33891,
+    SPELL_DRUID_INNER_PEACE                    = 197073,
     SPELL_DRUID_INNERVATE                      = 29166,
     SPELL_DRUID_INNERVATE_RANK_2               = 326228,
     SPELL_DRUID_INFUSION                       = 37238,
@@ -96,7 +99,9 @@ enum DruidSpells
     SPELL_DRUID_MANGLE                         = 33917,
     SPELL_DRUID_MASS_ENTANGLEMENT              = 102359,
     SPELL_DRUID_MOONFIRE_DAMAGE                = 164812,
+    SPELL_DRUID_POWER_OF_THE_ARCHDRUID         = 392302,
     SPELL_DRUID_PROWL                          = 5215,
+    SPELL_DRUID_REGROWTH                       = 8936,
     SPELL_DRUID_REJUVENATION                   = 774,
     SPELL_DRUID_REJUVENATION_GERMINATION       = 155777,
     SPELL_DRUID_REJUVENATION_T10_PROC          = 70691,
@@ -350,6 +355,26 @@ class spell_dru_dash : public AuraScript
     }
 };
 
+// 203974 - Earthwarden
+class spell_dru_earthwarden : public AuraScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_THRASH_CAT, SPELL_DRUID_THRASH_BEAR, SPELL_DRUID_EARTHWARDEN_AURA });
+    }
+
+    void HandleProc(AuraEffect* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    {
+        Unit* target = GetTarget();
+        target->CastSpell(target, SPELL_DRUID_EARTHWARDEN_AURA, true);
+    }
+
+    void Register() override
+    {
+        OnEffectProc += AuraEffectProcFn(spell_dru_earthwarden::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
 class spell_dru_eclipse_common
 {
 public:
@@ -514,21 +539,18 @@ class spell_dru_efflorescence : public SpellScript
         GetCaster()->RemoveAreaTrigger(GetSpellInfo()->Id);
     }
 
+    void InitSummon()
+    {
+        for (SpellLogEffectGenericVictimParams const& summonedObject : GetSpell()->GetExecuteLogEffectTargets(SPELL_EFFECT_SUMMON, &SpellLogEffect::GenericVictimTargets))
+            if (Unit* summon = ObjectAccessor::GetCreature(*GetCaster(), summonedObject.Victim))
+                summon->CastSpell(summon, SPELL_DRUID_EFFLORESCENCE_AURA,
+                    CastSpellExtraArgs().SetTriggeringSpell(GetSpell()));
+    }
+
     void Register() override
     {
         OnEffectLaunch += SpellEffectFn(spell_dru_efflorescence::RemoveOldAreaTrigger, EFFECT_2, SPELL_EFFECT_CREATE_AREATRIGGER);
-    }
-};
-
-struct npc_dru_efflorescence : public NullCreatureAI
-{
-    explicit npc_dru_efflorescence(Creature* creature) : NullCreatureAI(creature)
-    {
-    }
-
-    void InitializeAI() override
-    {
-        me->CastSpell(me, SPELL_DRUID_EFFLORESCENCE_AURA);
+        AfterCast += SpellCastFn(spell_dru_efflorescence::InitSummon);
     }
 };
 
@@ -571,23 +593,69 @@ class spell_dru_efflorescence_heal : public SpellScript
     }
 };
 
-// 203974 - Earthwarden
-class spell_dru_earthwarden : public AuraScript
+// 392124 - Embrace of the Dream
+class spell_dru_embrace_of_the_dream : public AuraScript
 {
-    bool Validate(SpellInfo const* /*spellInfo*/) override
+    bool Validate(SpellInfo const* spellInfo) override
     {
-        return ValidateSpellInfo({ SPELL_DRUID_THRASH_CAT, SPELL_DRUID_THRASH_BEAR, SPELL_DRUID_EARTHWARDEN_AURA });
+        return ValidateSpellInfo ({ SPELL_DRUID_EMBRACE_OF_THE_DREAM_EFFECT })
+            && ValidateSpellEffect({ { spellInfo->Id, EFFECT_2 } });
     }
 
-    void HandleProc(AuraEffect* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
+    bool CheckProc(AuraEffect const* /*aurEff*/, ProcEventInfo const& /*eventInfo*/) const
     {
-        Unit* target = GetTarget();
-        target->CastSpell(target, SPELL_DRUID_EARTHWARDEN_AURA, true);
+        return roll_chance_i(GetEffectInfo(EFFECT_2).CalcValue(GetCaster()));
+    }
+
+    void HandleProc(AuraEffect const* aurEff, ProcEventInfo const& eventInfo) const
+    {
+        GetTarget()->CastSpell(GetTarget(), SPELL_DRUID_EMBRACE_OF_THE_DREAM_EFFECT,
+            CastSpellExtraArgs(TRIGGERED_IGNORE_CAST_IN_PROGRESS | TRIGGERED_DONT_REPORT_CAST_ERROR)
+            .SetTriggeringAura(aurEff)
+            .SetTriggeringSpell(eventInfo.GetProcSpell()));
     }
 
     void Register() override
     {
-        OnEffectProc += AuraEffectProcFn(spell_dru_earthwarden::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        DoCheckEffectProc += AuraCheckEffectProcFn(spell_dru_embrace_of_the_dream::CheckProc, EFFECT_0, SPELL_AURA_DUMMY);
+        OnEffectProc += AuraEffectProcFn(spell_dru_embrace_of_the_dream::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 392146 - Embrace of the Dream (Selector)
+class spell_dru_embrace_of_the_dream_effect : public SpellScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo
+        ({
+            SPELL_DRUID_EMBRACE_OF_THE_DREAM_HEAL,
+            SPELL_DRUID_REGROWTH,
+            SPELL_DRUID_REJUVENATION,
+            SPELL_DRUID_REJUVENATION_GERMINATION
+        });
+    }
+
+    void FilterTargets(std::list<WorldObject*>& targets) const
+    {
+        targets.remove_if([&](WorldObject const* target)
+        {
+            Unit const* unitTarget = target->ToUnit();
+            return !unitTarget || !unitTarget->GetAuraEffect(SPELL_AURA_PERIODIC_HEAL, SPELLFAMILY_DRUID, flag128(0x50, 0, 0, 0), GetCaster()->GetGUID());
+        });
+    }
+
+    void HandleEffect(SpellEffIndex /*effIndex*/) const
+    {
+        GetCaster()->CastSpell(GetHitUnit(), SPELL_DRUID_EMBRACE_OF_THE_DREAM_HEAL,
+            CastSpellExtraArgs(TRIGGERED_IGNORE_CAST_IN_PROGRESS | TRIGGERED_DONT_REPORT_CAST_ERROR)
+            .SetTriggeringSpell(GetSpell()));
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dru_embrace_of_the_dream_effect::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ALLY);
+        OnEffectHitTarget += SpellEffectFn(spell_dru_embrace_of_the_dream_effect::HandleEffect, EFFECT_0, SPELL_EFFECT_DUMMY);
     }
 };
 
@@ -969,6 +1037,31 @@ class spell_dru_incarnation_tree_of_life : public AuraScript
     }
 };
 
+// 740 - Tranquility
+class spell_dru_inner_peace : public SpellScript
+{
+    bool Validate(SpellInfo const* spellInfo) override
+    {
+        return ValidateSpellInfo({ SPELL_DRUID_INNER_PEACE })
+            && ValidateSpellEffect({ { spellInfo->Id, EFFECT_4 } })
+            && spellInfo->GetEffect(EFFECT_3).IsAura(SPELL_AURA_MECHANIC_IMMUNITY_MASK)
+            && spellInfo->GetEffect(EFFECT_4).IsAura(SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN);
+    }
+
+    void PreventEffect(WorldObject*& target) const
+    {
+        // Note: Inner Peace talent.
+        if (!GetCaster()->HasAura(SPELL_DRUID_INNER_PEACE))
+            target = nullptr;
+    }
+
+    void Register() override
+    {
+        OnObjectTargetSelect += SpellObjectTargetSelectFn(spell_dru_inner_peace::PreventEffect, EFFECT_3, TARGET_UNIT_CASTER);
+        OnObjectTargetSelect += SpellObjectTargetSelectFn(spell_dru_inner_peace::PreventEffect, EFFECT_4, TARGET_UNIT_CASTER);
+    }
+};
+
 // 40442 - Druid Tier 6 Trinket
 class spell_dru_item_t6_trinket : public AuraScript
 {
@@ -1090,7 +1183,7 @@ class spell_dru_luxuriant_soil : public AuraScript
         float spellRange = eventInfo.GetSpellInfo()->GetMaxRange();
 
         std::vector<Unit*> targetList;
-        Trinity::WorldObjectSpellNearbyTargetCheck check(spellRange, rejuvCaster, eventInfo.GetSpellInfo(), TARGET_CHECK_ALLY, nullptr, TARGET_OBJECT_TYPE_UNIT);
+        Trinity::WorldObjectSpellAreaTargetCheck check(spellRange, rejuvCaster, rejuvCaster, rejuvCaster, eventInfo.GetSpellInfo(), TARGET_CHECK_ALLY, nullptr, TARGET_OBJECT_TYPE_UNIT);
         Trinity::UnitListSearcher searcher(rejuvCaster, targetList, check);
         Cell::VisitAllObjects(rejuvCaster, searcher, spellRange);
 
@@ -1144,6 +1237,54 @@ class spell_dru_omen_of_clarity : public AuraScript
     void Register() override
     {
         OnEffectProc += AuraEffectProcFn(spell_dru_omen_of_clarity::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+    }
+};
+
+// 392303 - Power of the Archdruid
+class spell_dru_power_of_the_archdruid : public AuraScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellEffect({ { SPELL_DRUID_POWER_OF_THE_ARCHDRUID, EFFECT_0 } });
+    }
+
+    static bool CheckProc(AuraEffect const* /*aurEff*/, ProcEventInfo const& eventInfo)
+    {
+        return eventInfo.GetActor()->HasAuraEffect(SPELL_DRUID_POWER_OF_THE_ARCHDRUID, EFFECT_0);
+    }
+
+    static void HandleProc(AuraEffect const* aurEff, ProcEventInfo const& eventInfo)
+    {
+        Unit* druid = eventInfo.GetActor();
+        Unit const* procTarget = eventInfo.GetActionTarget();
+
+        // range is EFFECT_0's BasePoints.
+        float spellRange = aurEff->GetAmount();
+
+        std::vector<Unit*> targetList;
+        Trinity::WorldObjectSpellAreaTargetCheck checker(spellRange, procTarget, druid, druid, eventInfo.GetSpellInfo(), TARGET_CHECK_ALLY, nullptr, TARGET_OBJECT_TYPE_UNIT);
+        Trinity::UnitListSearcher searcher(procTarget, targetList, checker);
+        Cell::VisitAllObjects(procTarget, searcher, spellRange);
+        std::erase(targetList, procTarget);
+
+        if (targetList.empty())
+            return;
+
+        AuraEffect const* powerOfTheArchdruidEffect = druid->GetAuraEffect(SPELL_DRUID_POWER_OF_THE_ARCHDRUID, EFFECT_0);
+
+        // max. targets is SPELL_DRUID_POWER_OF_THE_ARCHDRUID's EFFECT_0 BasePoints.
+        int32 maxTargets = powerOfTheArchdruidEffect->GetAmount();
+
+        Trinity::Containers::RandomResize(targetList, maxTargets);
+
+        for (Unit* chosenTarget : targetList)
+            druid->CastSpell(chosenTarget, eventInfo.GetProcSpell()->GetSpellInfo()->Id, aurEff);
+    }
+
+    void Register() override
+    {
+        DoCheckEffectProc += AuraCheckEffectProcFn(spell_dru_power_of_the_archdruid::CheckProc, EFFECT_0, SPELL_AURA_DUMMY);
+        OnEffectProc += AuraEffectProcFn(spell_dru_power_of_the_archdruid::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
@@ -1942,10 +2083,11 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_eclipse_aura);
     RegisterSpellScript(spell_dru_eclipse_dummy);
     RegisterSpellScript(spell_dru_eclipse_ooc);
-    RegisterCreatureAI(npc_dru_efflorescence);
     RegisterSpellScript(spell_dru_efflorescence);
     RegisterSpellScript(spell_dru_efflorescence_dummy);
     RegisterSpellScript(spell_dru_efflorescence_heal);
+    RegisterSpellScript(spell_dru_embrace_of_the_dream);
+    RegisterSpellScript(spell_dru_embrace_of_the_dream_effect);
     RegisterSpellAndAuraScriptPair(spell_dru_entangling_roots, spell_dru_entangling_roots_aura);
     RegisterSpellScript(spell_dru_ferocious_bite);
     RegisterSpellScript(spell_dru_forms_trinket);
@@ -1956,6 +2098,7 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_incapacitating_roar);
     RegisterSpellScript(spell_dru_incarnation);
     RegisterSpellScript(spell_dru_incarnation_tree_of_life);
+    RegisterSpellScript(spell_dru_inner_peace);
     RegisterSpellScript(spell_dru_innervate);
     RegisterSpellScript(spell_dru_item_t6_trinket);
     RegisterSpellScript(spell_dru_lifebloom);
@@ -1963,6 +2106,7 @@ void AddSC_druid_spell_scripts()
     RegisterSpellScript(spell_dru_luxuriant_soil);
     RegisterSpellScript(spell_dru_moonfire);
     RegisterSpellScript(spell_dru_omen_of_clarity);
+    RegisterSpellScript(spell_dru_power_of_the_archdruid);
     RegisterSpellScript(spell_dru_prowl);
     RegisterSpellScript(spell_dru_rip);
     RegisterSpellAndAuraScriptPair(spell_dru_savage_roar, spell_dru_savage_roar_aura);
