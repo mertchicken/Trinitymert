@@ -40,6 +40,7 @@
 
 enum PriestSpells
 {
+    SPELL_PRIEST_ABYSSAL_REVERIE                    = 373054,
     SPELL_PRIEST_ANGELIC_FEATHER_AREATRIGGER        = 158624,
     SPELL_PRIEST_ANGELIC_FEATHER_AURA               = 121557,
     SPELL_PRIEST_ANSWERED_PRAYERS                   = 394289,
@@ -393,6 +394,12 @@ public:
         return _appliedAtonements;
     }
 
+    struct TriggerArgs
+    {
+        SpellInfo const* TriggeredBy = nullptr;
+        SpellSchoolMask DamageSchoolMask = SPELL_SCHOOL_MASK_NONE;
+    };
+
     void TriggerAtonementHealOnTargets(AuraEffect const* atonementEffect, ProcEventInfo const& eventInfo)
     {
         Unit* priest = GetUnitOwner();
@@ -401,6 +408,10 @@ public:
 
         // Note: atonementEffect holds the correct amount since we passed the effect in the AuraScript that calls this method.
         args.AddSpellMod(SPELLVALUE_BASE_POINT0, CalculatePct(damageInfo->GetDamage(), atonementEffect->GetAmount()));
+
+        args.SetCustomArg(TriggerArgs{
+            .TriggeredBy = eventInfo.GetSpellInfo(),
+            .DamageSchoolMask = eventInfo.GetDamageInfo()->GetSchoolMask() });
 
         float distanceLimit = GetEffectInfo(EFFECT_1).CalcValue();
 
@@ -426,6 +437,30 @@ public:
         for (SpellEffIndex effectIndex : { EFFECT_0, EFFECT_1, EFFECT_2 })
             if (AuraEffect* sinOfTheMany = GetUnitOwner()->GetAuraEffect(SPELL_PRIEST_SINS_OF_THE_MANY, effectIndex))
                 sinOfTheMany->ChangeAmount(damageByStack[std::min(_appliedAtonements.size(), damageByStack.size() - 1)]);
+    }
+};
+
+// 81751 - Atonement (Heal)
+class spell_pri_abyssal_reverie : public SpellScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellEffect({ { SPELL_PRIEST_ABYSSAL_REVERIE, EFFECT_0 }  });
+    }
+
+    void CalculateHealingBonus(Unit const* /*victim*/, int32 const& /*healing*/, int32 const& /*flatMod*/, float& pctMod) const
+    {
+        spell_pri_atonement::TriggerArgs const* args = std::any_cast<spell_pri_atonement::TriggerArgs>(&GetSpell()->m_customArg);
+        if (!args || !(args->DamageSchoolMask & SPELL_SCHOOL_MASK_SHADOW))
+            return;
+
+        if (AuraEffect* const abyssalReverieEffect = GetCaster()->GetAuraEffect(SPELL_PRIEST_ABYSSAL_REVERIE, EFFECT_0))
+            AddPct(pctMod, abyssalReverieEffect->GetAmount());
+    }
+
+    void Register() override
+    {
+        CalcHealing += SpellCalcHealingFn(spell_pri_abyssal_reverie::CalculateHealingBonus);
     }
 };
 
@@ -460,7 +495,7 @@ class spell_pri_atonement_passive : public AuraScript
     }
 };
 
-// 194384, 214206 - Atonement
+// 194384 - Atonement (Buff), 214206 - Atonement [Trinity] (Buff)
 class spell_pri_atonement_triggered : public AuraScript
 {
     bool Validate(SpellInfo const* /*spellInfo*/) override
@@ -1202,6 +1237,85 @@ class spell_pri_holy_words : public AuraScript
     void Register() override
     {
         OnEffectProc += AuraEffectProcFn(spell_pri_holy_words::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// 265202 - Holy Word: Salvation
+class spell_pri_holy_word_salvation : public SpellScript
+{
+    bool Validate(SpellInfo const* spellInfo) override
+    {
+        return ValidateSpellInfo
+        ({
+            SPELL_PRIEST_PRAYER_OF_MENDING_AURA,
+            SPELL_PRIEST_RENEW
+        }) && ValidateSpellEffect({
+            { SPELL_PRIEST_PRAYER_OF_MENDING_HEAL, EFFECT_0 },
+            { spellInfo->Id, EFFECT_1 }
+        }) && spellInfo->GetEffect(EFFECT_1).TargetB.GetTarget() == TARGET_UNIT_SRC_AREA_ALLY;
+    }
+
+    bool Load() override
+    {
+        _spellInfoHeal = sSpellMgr->AssertSpellInfo(SPELL_PRIEST_PRAYER_OF_MENDING_HEAL, DIFFICULTY_NONE);
+        _healEffectDummy = &_spellInfoHeal->GetEffect(EFFECT_0);
+        return true;
+    }
+
+    void HandleApplyBuffs(SpellEffIndex /*effIndex*/) const
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetHitUnit();
+
+        CastSpellExtraArgs args;
+        args.TriggerFlags = TRIGGERED_FULL_MASK;
+
+        // amount of Prayer of Mending is SPELL_PRIEST_HOLY_WORD_SALVATION's EFFECT_1.
+        args.AddSpellMod(SPELLVALUE_AURA_STACK, GetEffectValue());
+
+        int32 basePoints = caster->SpellHealingBonusDone(target, _spellInfoHeal, _healEffectDummy->CalcValue(caster), HEAL, *_healEffectDummy);
+        args.AddSpellMod(SPELLVALUE_BASE_POINT0, basePoints);
+        caster->CastSpell(target, SPELL_PRIEST_PRAYER_OF_MENDING_AURA, args);
+
+        // a full duration Renew is triggered.
+        caster->CastSpell(target, SPELL_PRIEST_RENEW, CastSpellExtraArgs(TRIGGERED_FULL_MASK).SetTriggeringSpell(GetSpell()));
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(spell_pri_holy_word_salvation::HandleApplyBuffs, EFFECT_1, SPELL_EFFECT_DUMMY);
+    }
+
+    SpellInfo const* _spellInfoHeal = nullptr;
+    SpellEffectInfo const* _healEffectDummy = nullptr;
+};
+
+// 2050 - Holy Word: Serenity
+// 34861 - Holy Word: Sanctify
+class spell_pri_holy_word_salvation_cooldown_reduction : public SpellScript
+{
+    bool Validate(SpellInfo const* /*spellInfo*/) override
+    {
+        return ValidateSpellInfo({ SPELL_PRIEST_HOLY_WORD_SALVATION })
+            && ValidateSpellEffect({ { SPELL_PRIEST_HOLY_WORD_SALVATION, EFFECT_2 } });
+    }
+
+    bool Load() override
+    {
+        return GetCaster()->HasSpell(SPELL_PRIEST_HOLY_WORD_SALVATION);
+    }
+
+    void ReduceCooldown() const
+    {
+        // cooldown reduced by SPELL_PRIEST_HOLY_WORD_SALVATION's Seconds(EFFECT_2).
+        int32 cooldownReduction = sSpellMgr->AssertSpellInfo(SPELL_PRIEST_HOLY_WORD_SALVATION, GetCastDifficulty())->GetEffect(EFFECT_2).CalcValue(GetCaster());
+
+        GetCaster()->GetSpellHistory()->ModifyCooldown(SPELL_PRIEST_HOLY_WORD_SALVATION, Seconds(-cooldownReduction), true);
+    }
+
+    void Register() override
+    {
+        AfterCast += SpellCastFn(spell_pri_holy_word_salvation_cooldown_reduction::ReduceCooldown);
     }
 };
 
@@ -2618,6 +2732,7 @@ void AddSC_priest_spell_scripts()
 {
     RegisterSpellScript(spell_pri_angelic_feather_trigger);
     RegisterAreaTriggerAI(areatrigger_pri_angelic_feather);
+    RegisterSpellScript(spell_pri_abyssal_reverie);
     RegisterSpellScript(spell_pri_answered_prayers);
     RegisterSpellScript(spell_pri_aq_3p_bonus);
     RegisterSpellScript(spell_pri_atonement);
@@ -2640,6 +2755,8 @@ void AddSC_priest_spell_scripts()
     RegisterSpellScript(spell_pri_halo_shadow);
     RegisterAreaTriggerAI(areatrigger_pri_halo);
     RegisterSpellScript(spell_pri_holy_words);
+    RegisterSpellScript(spell_pri_holy_word_salvation);
+    RegisterSpellScript(spell_pri_holy_word_salvation_cooldown_reduction);
     RegisterSpellScript(spell_pri_item_t6_trinket);
     RegisterSpellScript(spell_pri_leap_of_faith_effect_trigger);
     RegisterSpellScript(spell_pri_levitate);
