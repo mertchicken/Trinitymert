@@ -156,7 +156,7 @@ static void UpdatePlayerReforgeStats(Item* invItem, Player* player, uint32 decre
     data.stat_value = stat_diff;
     if (invItem->IsEquipped())
         player->_ApplyItemMods(invItem, invItem->GetSlot(), true);
-    // CharacterDatabase.PExecute("REPLACE INTO `custom_reforging` (`GUID`, `increase`, `decrease`, `stat_value`) VALUES (%u, %u, %u, %i)", guidlow, increase, decrease, stat_diff);
+    // CharacterDatabase.PExecute("REPLACE INTO `custom_reforging` (`GUID`, `increase`, `decrease`, `stat_value`) VALUES ({}, {}, {}, {})", guidlow, increase, decrease, stat_diff);
     player->ModifyMoney(pProto->SellPrice < (10 * GOLD) ? (-10 * GOLD) : -(int32)pProto->SellPrice);
     SendReforgePacket(player, invItem->GetEntry(), 0, &data);
     // player->SaveToDB();
@@ -189,7 +189,7 @@ public:
     void OnLogin(Player* player, bool /*firstLogin*/) override
     {
         uint32 playerGUID = player->GetGUID().GetCounter();
-        QueryResult result = CharacterDatabase.PQuery("SELECT `GUID`, `increase`, `decrease`, `stat_value` FROM `custom_reforging` WHERE `Owner` = %u", playerGUID);
+        QueryResult result = CharacterDatabase.PQuery("SELECT `GUID`, `increase`, `decrease`, `stat_value` FROM `custom_reforging` WHERE `Owner` = {}", playerGUID);
         if (result)
         {
             do
@@ -227,7 +227,7 @@ public:
     {
         uint32 lowguid = player->GetGUID().GetCounter();
         auto trans = CharacterDatabase.BeginTransaction();
-        trans->PAppend("DELETE FROM `custom_reforging` WHERE `Owner` = %u", lowguid);
+        trans->PAppend("DELETE FROM `custom_reforging` WHERE `Owner` = {}", lowguid);
         if (!player->reforgeMap.empty())
         {
             // Only save items that are in inventory / bank / etc
@@ -239,7 +239,7 @@ public:
                     continue;
 
                 const ReforgeData& data = it2->second;
-                trans->PAppend("REPLACE INTO `custom_reforging` (`GUID`, `increase`, `decrease`, `stat_value`, `Owner`) VALUES (%u, %u, %u, %i, %u)", it2->first, data.increase, data.decrease, data.stat_value, lowguid);
+                trans->PAppend("REPLACE INTO `custom_reforging` (`GUID`, `increase`, `decrease`, `stat_value`, `Owner`) VALUES ({}, {}, {}, {}, {})", it2->first, data.increase, data.decrease, data.stat_value, lowguid);
             }
         }
 
