@@ -9063,7 +9063,7 @@ void ObjectMgr::LoadCreatureOutfits()
 
         if (!CreatureOutfit::IsFake(entry))
         {
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has too low entry (entry <= %u). Ignoring.", entry, CreatureOutfit::max_real_modelid);
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has too low entry (entry <= {}). Ignoring.", entry, CreatureOutfit::max_real_modelid);
             continue;
         }
 
@@ -9073,14 +9073,14 @@ void ObjectMgr::LoadCreatureOutfits()
         co->npcsoundsid = fields[i++].GetUInt32();
         if (co->npcsoundsid && !sNPCSoundsStore.HasRecord(co->npcsoundsid))
         {
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has incorrect npcsoundsid (%u). Using 0.", entry, co->npcsoundsid);
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has incorrect npcsoundsid ({}). Using 0.", entry, co->npcsoundsid);
             co->npcsoundsid = 0;
         }
         co->race         = fields[i++].GetUInt8();
         const ChrRacesEntry* rEntry = sChrRacesStore.LookupEntry(co->race);
         if (!rEntry)
         {
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has incorrect race (%u).", entry, uint32(co->race));
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has incorrect race ({}).", entry, uint32(co->race));
             continue;
         }
 
@@ -9088,7 +9088,7 @@ void ObjectMgr::LoadCreatureOutfits()
         const ChrClassesEntry* cEntry = sChrClassesStore.LookupEntry(co->Class);
         if (!cEntry)
         {
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has incorrect class (%u).", entry, uint32(co->Class));
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has incorrect class ({}).", entry, uint32(co->Class));
             continue;
         }
 
@@ -9102,7 +9102,7 @@ void ObjectMgr::LoadCreatureOutfits()
         case GENDER_FEMALE: co->displayId = femaleModel->DisplayID; break;
         case GENDER_MALE:   co->displayId = maleModel->DisplayID; break;
         default:
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has invalid gender %u", entry, uint32(co->gender));
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has invalid gender {}", entry, uint32(co->gender));
             continue;
         }
 
@@ -9198,7 +9198,7 @@ void ObjectMgr::LoadCreatureOutfits()
 
         if (!ValidateAppearance((Races)co->race, (Classes)co->Class, (Gender)co->gender, MakeChrCustomizationChoiceRange(co->Customizations)))
         {
-            TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has invalid customizations for (gender, race, class) combination", entry);
+            TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has invalid customizations for (gender, race, class) combination", entry);
             continue;
         }
 
@@ -9213,7 +9213,7 @@ void ObjectMgr::LoadCreatureOutfits()
                     co->outfitdisplays[slot] = display;
                 else
                 {
-                    TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` has invalid (item entry, appearance) combination: %u, %u. Ignoring.", entry, item_entry, appearancemodid);
+                    TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` has invalid (item entry, appearance) combination: {}, {}. Ignoring.", entry, item_entry, appearancemodid);
                     co->outfitdisplays[slot] = 0;
                 }
             }
@@ -9221,7 +9221,7 @@ void ObjectMgr::LoadCreatureOutfits()
             {
                 if (appearancemodid)
                 {
-                    TC_LOG_ERROR("server.loading", ">> Outfit entry %u in `creature_template_outfits` is using displayid (negative value), but also has appearance set (displayid, appearance): %s, %u. Ignoring appearance.", entry, std::to_string(displayInfo).c_str(), appearancemodid);
+                    TC_LOG_ERROR("server.loading", ">> Outfit entry {} in `creature_template_outfits` is using displayid (negative value), but also has appearance set (displayid, appearance): {}, {}. Ignoring appearance.", entry, std::to_string(displayInfo), appearancemodid);
                 }
                 co->outfitdisplays[slot] = static_cast<uint32>(-displayInfo);
             }
@@ -9234,7 +9234,7 @@ void ObjectMgr::LoadCreatureOutfits()
     }
     while (result->NextRow());
 
-    TC_LOG_INFO("server.loading", ">> Loaded %u creature outfits in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    TC_LOG_INFO("server.loading", ">> Loaded {} creature outfits in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
 std::shared_ptr<CreatureOutfit> const & ObjectMgr::GetOutfit(uint32 modelid) const
