@@ -31,6 +31,13 @@ struct CreatureData;
 
 enum class FlagState : uint8;
 
+enum class EncounterType : uint8
+{
+    DungeonEncounter,
+    Battleground,
+    MythicPlusRun
+};
+
 class TC_GAME_API ZoneScript
 {
     public:
@@ -53,7 +60,7 @@ class TC_GAME_API ZoneScript
         virtual void OnAreaTriggerCreate([[maybe_unused]] AreaTrigger* areaTrigger) { }
         virtual void OnAreaTriggerRemove([[maybe_unused]] AreaTrigger* areaTrigger) { }
 
-        virtual void OnUnitDeath(Unit*) { }
+        virtual void OnUnitDeath([[maybe_unused]] Unit* unit) { }
 
         //All-purpose data storage ObjectGuid
         virtual ObjectGuid GetGuidData(uint32 /*DataId*/) const { return ObjectGuid::Empty; }
