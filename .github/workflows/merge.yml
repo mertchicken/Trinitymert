@@ -105,7 +105,7 @@ jobs:
         mysql -uroot -e 'create database test_mysql;'
         cd bin/check_install/bin
         7z x ./*.7z
-        ./worldserver --update-databases-only
+        yes | ./worldserver --update-databases-only
 
     - name: Run SQLs
       if: matrix.pch == 'ON'
@@ -232,7 +232,7 @@ jobs:
         mysql -uroot -e 'create database test_mysql;'
         cd bin/check_install/bin
         7z x ./*.7z
-        ./worldserver --update-databases-only
+        yes | ./worldserver --update-databases-only
 
     - name: Run SQLs
       if: matrix.pch == 'ON'
