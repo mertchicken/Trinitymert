@@ -105,7 +105,6 @@ jobs:
         mysql -uroot -e 'create database test_mysql;'
         cd bin/check_install/bin
         7z x ./*.7z
-        while true; do MYSQL_USER="root" MYSQL_DATABASE="world" && (sudo systemctl status mysql; ps aux | grep mysql; sudo netstat -tuln | grep 3306; (mysql -u "$MYSQL_USER" -p -e "USE $MYSQL_DATABASE; SHOW TABLES;" || true)); sleep 5; done &
         yes | ./worldserver --update-databases-only
 
     - name: Run SQLs
