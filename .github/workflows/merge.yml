@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
         fetch-depth: 0
@@ -75,7 +75,7 @@ jobs:
         ./worldserver --version
     - name: Find latest DB release tag
       id: find_matching_tags
-      uses: Rochet2/find-matching-tags-ghapi@v1.2
+      uses: Rochet2/find-matching-tags-ghapi@v1.3
       with:
         regex: ^TDB\d{4,}\.\d+$
         sort: desc
@@ -159,7 +159,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
         fetch-depth: 0
@@ -202,7 +202,7 @@ jobs:
         ./worldserver --version
     - name: Find latest DB release tag
       id: find_matching_tags
-      uses: Rochet2/find-matching-tags-ghapi@v1.2
+      uses: Rochet2/find-matching-tags-ghapi@v1.3
       with:
         regex: ^TDB335\.\d+$
         sort: desc
