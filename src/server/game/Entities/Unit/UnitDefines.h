@@ -22,6 +22,11 @@
 #include "EnumFlag.h"
 #include <string>
 
+namespace UF
+{
+struct DeclinedNames;
+}
+
 #define MIN_MELEE_REACH             2.0f
 #define NOMINAL_MELEE_RANGE         5.0f
 #define MELEE_RANGE                 (NOMINAL_MELEE_RANGE - MIN_MELEE_REACH * 2) //center to center for players
@@ -342,6 +347,7 @@ enum NPCFlags2 : uint32
     UNIT_NPC_FLAG_2_AZERITE_RESPEC          = 0x00004000,   // TITLE is azerite respec
     UNIT_NPC_FLAG_2_ISLANDS_QUEUE           = 0x00008000,   // TITLE is islands queue
     UNIT_NPC_FLAG_2_SUPPRESS_NPC_SOUNDS_EXCEPT_END_OF_INTERACTION   = 0x00010000,
+    UNIT_NPC_FLAG_2_PERSONAL_TABARD_DESIGNER= 0x00200000,   // TITLE is personal tabard designer
 };
 
 DEFINE_ENUM_FLAG(NPCFlags2);
@@ -467,10 +473,21 @@ enum HitInfo
     HITINFO_FAKE_DAMAGE         = 0x01000000                // enables damage animation even if no damage done, set only if no damage
 };
 
+enum class AttackSwingErr : uint8
+{
+    NotInRange  = 0,
+    BadFacing   = 1,
+    CantAttack  = 2,
+    DeadTarget  = 3
+};
+
 #define MAX_DECLINED_NAME_CASES 5
 
-struct DeclinedName
+struct TC_GAME_API DeclinedName
 {
+    DeclinedName() = default;
+    DeclinedName(UF::DeclinedNames const& uf);
+
     std::string name[MAX_DECLINED_NAME_CASES];
 };
 

@@ -310,7 +310,7 @@ WorldPacket const* WorldPackets::Chat::ChatPlayerAmbiguous::Write()
 
 WorldPacket const* WorldPackets::Chat::ChatRestricted::Write()
 {
-    _worldPacket << uint8(Reason);
+    _worldPacket << int32(Reason);
 
     return &_worldPacket;
 }
@@ -324,6 +324,20 @@ WorldPacket const* WorldPackets::Chat::CanLocalWhisperTargetResponse::Write()
 {
     _worldPacket << WhisperTarget;
     _worldPacket << int32(Status);
+
+    return &_worldPacket;
+}
+
+void WorldPackets::Chat::UpdateAADCStatus::Read()
+{
+    ChatDisabled = _worldPacket.ReadBit();
+}
+
+WorldPacket const* WorldPackets::Chat::UpdateAADCStatusResponse::Write()
+{
+    _worldPacket.WriteBit(Success);
+    _worldPacket.WriteBit(ChatDisabled);
+    _worldPacket.FlushBits();
 
     return &_worldPacket;
 }
