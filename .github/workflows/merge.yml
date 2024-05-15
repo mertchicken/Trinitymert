@@ -41,6 +41,7 @@ jobs:
       with:
         ref: ${{ matrix.branch }}
         fetch-depth: 0
+        token: ${{ secrets.WORKFLOW_TOKEN }}
 
     - name: Configure user
       run: |
@@ -163,6 +164,7 @@ jobs:
       with:
         ref: ${{ matrix.branch }}
         fetch-depth: 0
+        token: ${{ secrets.WORKFLOW_TOKEN }}
 
     - name: Configure user
       run: |
