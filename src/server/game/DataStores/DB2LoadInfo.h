@@ -34,7 +34,7 @@ struct AchievementLoadInfo
         { false, FT_INT, "ID" },
         { true, FT_SHORT, "InstanceID" },
         { true, FT_BYTE, "Faction" },
-        { true, FT_SHORT, "Supercedes" },
+        { true, FT_INT, "Supercedes" },
         { true, FT_SHORT, "Category" },
         { true, FT_BYTE, "MinimumCriteria" },
         { true, FT_BYTE, "Points" },
@@ -841,6 +841,19 @@ struct ChallengeModeItemBonusOverrideLoadInfo
     static constexpr DB2LoadInfo Instance{ Fields, 8, &ChallengeModeItemBonusOverrideMeta::Instance, HOTFIX_SEL_CHALLENGE_MODE_ITEM_BONUS_OVERRIDE };
 };
 
+struct CharBaseInfoLoadInfo
+{
+    static constexpr DB2FieldMeta Fields[4] =
+    {
+        { false, FT_INT, "ID" },
+        { true, FT_BYTE, "RaceID" },
+        { true, FT_BYTE, "ClassID" },
+        { true, FT_INT, "OtherFactionRaceID" },
+    };
+
+    static constexpr DB2LoadInfo Instance{ Fields, 4, &CharBaseInfoMeta::Instance, HOTFIX_SEL_CHAR_BASE_INFO };
+};
+
 struct CharTitlesLoadInfo
 {
     static constexpr DB2FieldMeta Fields[5] =
@@ -1286,11 +1299,13 @@ struct ConditionalContentTuningLoadInfo
 
 struct ContentTuningLoadInfo
 {
-    static constexpr DB2FieldMeta Fields[13] =
+    static constexpr DB2FieldMeta Fields[15] =
     {
         { false, FT_INT, "ID" },
         { true, FT_INT, "Flags" },
         { true, FT_INT, "ExpansionID" },
+        { true, FT_INT, "HealthItemLevelCurveID" },
+        { true, FT_INT, "DamageItemLevelCurveID" },
         { true, FT_INT, "MinLevel" },
         { true, FT_INT, "MaxLevel" },
         { true, FT_INT, "MinLevelType" },
@@ -1303,7 +1318,7 @@ struct ContentTuningLoadInfo
         { false, FT_FLOAT, "QuestXpMultiplier" },
     };
 
-    static constexpr DB2LoadInfo Instance{ Fields, 13, &ContentTuningMeta::Instance, HOTFIX_SEL_CONTENT_TUNING };
+    static constexpr DB2LoadInfo Instance{ Fields, 15, &ContentTuningMeta::Instance, HOTFIX_SEL_CONTENT_TUNING };
 };
 
 struct ContentTuningXExpectedLoadInfo
@@ -3013,7 +3028,7 @@ struct ItemLimitCategoryConditionLoadInfo
 
 struct ItemModifiedAppearanceLoadInfo
 {
-    static constexpr DB2FieldMeta Fields[6] =
+    static constexpr DB2FieldMeta Fields[7] =
     {
         { false, FT_INT, "ID" },
         { true, FT_INT, "ItemID" },
@@ -3021,9 +3036,10 @@ struct ItemModifiedAppearanceLoadInfo
         { true, FT_INT, "ItemAppearanceID" },
         { true, FT_INT, "OrderIndex" },
         { false, FT_BYTE, "TransmogSourceTypeEnum" },
+        { true, FT_INT, "Flags" },
     };
 
-    static constexpr DB2LoadInfo Instance{ Fields, 6, &ItemModifiedAppearanceMeta::Instance, HOTFIX_SEL_ITEM_MODIFIED_APPEARANCE };
+    static constexpr DB2LoadInfo Instance{ Fields, 7, &ItemModifiedAppearanceMeta::Instance, HOTFIX_SEL_ITEM_MODIFIED_APPEARANCE };
 };
 
 struct ItemModifiedAppearanceExtraLoadInfo
@@ -4969,6 +4985,31 @@ struct SpellEffectLoadInfo
     };
 
     static constexpr DB2LoadInfo Instance{ Fields, 36, &SpellEffectMeta::Instance, HOTFIX_SEL_SPELL_EFFECT };
+};
+
+struct SpellEmpowerLoadInfo
+{
+    static constexpr DB2FieldMeta Fields[3] =
+    {
+        { false, FT_INT, "ID" },
+        { true, FT_INT, "SpellID" },
+        { true, FT_INT, "Unused1000" },
+    };
+
+    static constexpr DB2LoadInfo Instance{ Fields, 3, &SpellEmpowerMeta::Instance, HOTFIX_SEL_SPELL_EMPOWER };
+};
+
+struct SpellEmpowerStageLoadInfo
+{
+    static constexpr DB2FieldMeta Fields[4] =
+    {
+        { false, FT_INT, "ID" },
+        { true, FT_INT, "Stage" },
+        { true, FT_INT, "DurationMs" },
+        { false, FT_INT, "SpellEmpowerID" },
+    };
+
+    static constexpr DB2LoadInfo Instance{ Fields, 4, &SpellEmpowerStageMeta::Instance, HOTFIX_SEL_SPELL_EMPOWER_STAGE };
 };
 
 struct SpellEquippedItemsLoadInfo
