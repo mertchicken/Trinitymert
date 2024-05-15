@@ -505,7 +505,7 @@ public:
             spawnData = sObjectMgr->GetGameObjectData(spawnId);
             if (!spawnData)
             {
-                handler->PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, spawnId);
+                handler->PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, std::to_string(spawnId).c_str());
                 handler->SetSentErrorMessage(true);
                 return false;
             }
@@ -638,7 +638,7 @@ public:
         GameObject* object = handler->GetObjectFromPlayerMapByDbGuid(guidLow);
         if (!object)
         {
-            handler->PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, guidLow);
+            handler->PSendSysMessage(LANG_COMMAND_OBJNOTFOUND, std::to_string(*guidLow).c_str());
             handler->SetSentErrorMessage(true);
             return false;
         }
