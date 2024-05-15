@@ -1514,7 +1514,8 @@ void ObjectMgr::LoadEquipmentTemplates()
                 continue;
             }
 
-            if (!sDB2Manager.GetItemModifiedAppearance(equipmentInfo.Items[i].ItemId, equipmentInfo.Items[i].AppearanceModId))
+            // AppearanceModId 0 is always valid
+            if (equipmentInfo.Items[i].AppearanceModId && !sDB2Manager.GetItemModifiedAppearance(equipmentInfo.Items[i].ItemId, equipmentInfo.Items[i].AppearanceModId))
             {
                 TC_LOG_ERROR("sql.sql", "Unknown item appearance for (ID={}, AppearanceModID={}) pair in creature_equip_template.ItemID{} creature_equip_template.AppearanceModID{} "
                     "for CreatureID = {} and ID={}, forced to default.",
@@ -1526,15 +1527,7 @@ void ObjectMgr::LoadEquipmentTemplates()
                 continue;
             }
 
-            if (dbcItem->InventoryType != INVTYPE_WEAPON &&
-                dbcItem->InventoryType != INVTYPE_SHIELD &&
-                dbcItem->InventoryType != INVTYPE_RANGED &&
-                dbcItem->InventoryType != INVTYPE_2HWEAPON &&
-                dbcItem->InventoryType != INVTYPE_WEAPONMAINHAND &&
-                dbcItem->InventoryType != INVTYPE_WEAPONOFFHAND &&
-                dbcItem->InventoryType != INVTYPE_HOLDABLE &&
-                dbcItem->InventoryType != INVTYPE_THROWN &&
-                dbcItem->InventoryType != INVTYPE_RANGEDRIGHT)
+            if (std::ranges::none_of(InventoryTypesEquipable, [dbcItem](InventoryType inventoryType) { return inventoryType == dbcItem->InventoryType; }))
             {
                 TC_LOG_ERROR("sql.sql", "Item (ID={}) in creature_equip_template.ItemID{} for CreatureID = {} and ID = {} is not equipable in a hand, forced to 0.",
                     equipmentInfo.Items[i].ItemId, i + 1, entry, id);
@@ -2135,9 +2128,9 @@ void ObjectMgr::LoadCreatures()
 
     //                                               0              1   2    3           4           5           6            7        8             9              10
     QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, position_x, position_y, position_z, orientation, modelid, equipment_id, spawntimesecs, wander_distance, "
-    //   11               12         13       14            15                 16          17           18                19                   20                    21
-        "currentwaypoint, curhealth, curmana, MovementType, spawnDifficulties, eventEntry, poolSpawnId, creature.npcflag, creature.unit_flags, creature.unit_flags2, creature.unit_flags3, "
-    //   22                      23                24                   25                       26                   27
+    //   11               12            13            14                 15          16           17                18                   19                    20
+        "currentwaypoint, curHealthPct, MovementType, spawnDifficulties, eventEntry, poolSpawnId, creature.npcflag, creature.unit_flags, creature.unit_flags2, creature.unit_flags3, "
+    //   21                      22                23                   24                       25                   26
         "creature.phaseUseFlags, creature.phaseid, creature.phasegroup, creature.terrainSwapMap, creature.ScriptName, creature.StringId, creature.size "
         "FROM creature "
         "LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid "
@@ -2182,28 +2175,27 @@ void ObjectMgr::LoadCreatures()
         data.equipmentId    = fields[8].GetInt8();
         data.spawntimesecs  = fields[9].GetUInt32();
         data.wander_distance = fields[10].GetFloat();
-        data.currentwaypoint= fields[11].GetUInt32();
-        data.curhealth      = fields[12].GetUInt32();
-        data.curmana        = fields[13].GetUInt32();
-        data.movementType   = fields[14].GetUInt8();
-        data.spawnDifficulties = ParseSpawnDifficulties(fields[15].GetStringView(), "creature", guid, data.mapId, spawnMasks[data.mapId]);
-        int16 gameEvent     = fields[16].GetInt8();
-        data.poolId         = fields[17].GetUInt32();
+        data.currentwaypoint = fields[11].GetUInt32();
+        data.curHealthPct   = fields[12].GetUInt32();
+        data.movementType   = fields[13].GetUInt8();
+        data.spawnDifficulties = ParseSpawnDifficulties(fields[14].GetStringView(), "creature", guid, data.mapId, spawnMasks[data.mapId]);
+        int16 gameEvent     = fields[15].GetInt8();
+        data.poolId         = fields[16].GetUInt32();
+        if (!fields[17].IsNull())
+            data.npcflag = fields[17].GetUInt64();
         if (!fields[18].IsNull())
-            data.npcflag = fields[18].GetUInt64();
+            data.unit_flags = fields[18].GetUInt32();
         if (!fields[19].IsNull())
-            data.unit_flags = fields[19].GetUInt32();
+            data.unit_flags2 = fields[19].GetUInt32();
         if (!fields[20].IsNull())
-            data.unit_flags2 = fields[20].GetUInt32();
-        if (!fields[21].IsNull())
-            data.unit_flags3 = fields[21].GetUInt32();
-        data.phaseUseFlags  = fields[22].GetUInt8();
-        data.phaseId        = fields[23].GetUInt32();
-        data.phaseGroup     = fields[24].GetUInt32();
-        data.terrainSwapMap = fields[25].GetInt32();
-        data.scriptId       = GetScriptId(fields[26].GetString());
-        data.StringId       = fields[27].GetString();
-        data.size = fields[28].GetFloat();
+            data.unit_flags3 = fields[20].GetUInt32();
+        data.phaseUseFlags  = fields[21].GetUInt8();
+        data.phaseId        = fields[22].GetUInt32();
+        data.phaseGroup     = fields[23].GetUInt32();
+        data.terrainSwapMap = fields[24].GetInt32();
+        data.scriptId       = GetScriptId(fields[25].GetString());
+        data.StringId       = fields[26].GetString();
+        data.size = fields[27].GetFloat();
         data.spawnGroupData = IsTransportMap(data.mapId) ? GetLegacySpawnGroup() : GetDefaultSpawnGroup(); // transport spawns default to compatibility group
 
         MapEntry const* mapEntry = sMapStore.LookupEntry(data.mapId);
@@ -2363,6 +2355,13 @@ void ObjectMgr::LoadCreatures()
                 TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: {} Entry: {}) with disallowed `unit_flags3` {}, removing incorrect flag.", guid, data.id, disallowedUnitFlags3);
                 *data.unit_flags3 &= UNIT_FLAG3_ALLOWED;
             }
+        }
+
+        uint32 healthPct = std::clamp<uint32>(data.curHealthPct, 1, 100);
+        if (data.curHealthPct != healthPct)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature` has creature (GUID: {} Entry: {}) with invalid `curHealthPct` {}, set to {}.", guid, data.id, data.curHealthPct, healthPct);
+            data.curHealthPct = healthPct;
         }
 
         if (sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA))
@@ -10723,6 +10722,11 @@ JumpChargeParams const* ObjectMgr::GetJumpChargeParams(int32 id) const
     return Trinity::Containers::MapGetValuePtr(_jumpChargeParams, id);
 }
 
+CreatureStaticFlagsOverride const* ObjectMgr::GetCreatureStaticFlagsOverride(ObjectGuid::LowType spawnId, Difficulty difficultyId) const
+{
+    return Trinity::Containers::MapGetValuePtr(_creatureStaticFlagsOverrideStore, std::make_pair(spawnId, difficultyId));
+}
+
 void ObjectMgr::LoadGameObjectQuestItems()
 {
     uint32 oldMSTime = getMSTime();
@@ -10854,6 +10858,67 @@ void ObjectMgr::LoadCreatureQuestCurrencies()
     while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded {} creature quest currencies in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadCreatureStaticFlagsOverride()
+{
+    // reload case
+    _creatureStaticFlagsOverrideStore.clear();
+
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0        1             2             3             4             5             6             7             8             9
+    QueryResult result = WorldDatabase.Query("SELECT SpawnId, DifficultyId, StaticFlags1, StaticFlags2, StaticFlags3, StaticFlags4, StaticFlags5, StaticFlags6, StaticFlags7, StaticFlags8 FROM creature_static_flags_override");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 creature static flag overrides. DB table `creature_static_flags_override` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        ObjectGuid::LowType spawnId = fields[0].GetUInt64();
+        Difficulty difficultyId = static_cast<Difficulty>(fields[1].GetUInt8());
+
+        CreatureData const* creatureData = GetCreatureData(spawnId);
+        if (!creatureData)
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature_static_flags_override` has data for nonexistent creature (SpawnId: {}), skipped", spawnId);
+            continue;
+        }
+
+        if (std::find(creatureData->spawnDifficulties.begin(), creatureData->spawnDifficulties.end(), difficultyId) == creatureData->spawnDifficulties.end())
+        {
+            TC_LOG_ERROR("sql.sql", "Table `creature_static_flags_override` has data for a creature that is not available for the specified DifficultyId (SpawnId: {}, DifficultyId: {}), skipped", spawnId, difficultyId);
+            continue;
+        }
+
+        CreatureStaticFlagsOverride& staticFlagsOverride = _creatureStaticFlagsOverrideStore[std::make_pair(spawnId, difficultyId)];
+        if (!fields[2].IsNull())
+            staticFlagsOverride.StaticFlags1 = static_cast<CreatureStaticFlags>(fields[2].GetUInt32());
+        if (!fields[3].IsNull())
+            staticFlagsOverride.StaticFlags2 = static_cast<CreatureStaticFlags2>(fields[3].GetUInt32());
+        if (!fields[4].IsNull())
+            staticFlagsOverride.StaticFlags3 = static_cast<CreatureStaticFlags3>(fields[4].GetUInt32());
+        if (!fields[5].IsNull())
+            staticFlagsOverride.StaticFlags4 = static_cast<CreatureStaticFlags4>(fields[5].GetUInt32());
+        if (!fields[6].IsNull())
+            staticFlagsOverride.StaticFlags5 = static_cast<CreatureStaticFlags5>(fields[6].GetUInt32());
+        if (!fields[7].IsNull())
+            staticFlagsOverride.StaticFlags6 = static_cast<CreatureStaticFlags6>(fields[7].GetUInt32());
+        if (!fields[8].IsNull())
+            staticFlagsOverride.StaticFlags7 = static_cast<CreatureStaticFlags7>(fields[8].GetUInt32());
+        if (!fields[9].IsNull())
+            staticFlagsOverride.StaticFlags8 = static_cast<CreatureStaticFlags8>(fields[9].GetUInt32());
+
+        ++count;
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded {} creature static flag overrides in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::InitializeQueriesData(QueryDataGroup mask)

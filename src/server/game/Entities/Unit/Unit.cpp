@@ -495,6 +495,29 @@ void Unit::Update(uint32 p_time)
     RefreshAI();
 }
 
+void Unit::Heartbeat()
+{
+    WorldObject::Heartbeat();
+
+    // SMSG_FLIGHT_SPLINE_SYNC for cyclic splines
+    SendFlightSplineSyncUpdate();
+
+    // Trigger heartbeat procs and generic aura behavior such as food emotes and invoking aura script hooks
+    TriggerAuraHeartbeat();
+
+    // Update Vignette position and visibility
+    if (m_vignette)
+        Vignettes::Update(*m_vignette, this);
+}
+
+void Unit::TriggerAuraHeartbeat()
+{
+    for (auto const& [_, auraApplication] : m_appliedAuras)
+        auraApplication->GetBase()->Heartbeat();
+
+    Unit::ProcSkillsAndAuras(this, nullptr, PROC_FLAG_HEARTBEAT, PROC_FLAG_NONE, PROC_SPELL_TYPE_MASK_ALL, PROC_SPELL_PHASE_NONE, PROC_HIT_NONE, nullptr, nullptr, nullptr);
+}
+
 bool Unit::haveOffhandWeapon() const
 {
     if (Player const* player = ToPlayer())
@@ -562,20 +585,6 @@ void Unit::UpdateSplineMovement(uint32 t_diff)
     movespline->updateState(t_diff);
     bool arrived = movespline->Finalized();
 
-    if (movespline->isCyclic())
-    {
-        m_splineSyncTimer.Update(t_diff);
-        if (m_splineSyncTimer.Passed())
-        {
-            m_splineSyncTimer.Reset(5000); // Retail value, do not change
-
-            WorldPackets::Movement::FlightSplineSync flightSplineSync;
-            flightSplineSync.Guid = GetGUID();
-            flightSplineSync.SplineDist = movespline->timePassed() / movespline->Duration();
-            SendMessageToSet(flightSplineSync.Write(), true);
-        }
-    }
-
     if (arrived)
     {
         DisableSpline();
@@ -609,6 +618,17 @@ void Unit::UpdateSplinePosition()
         loc.orientation = GetOrientation();
 
     UpdatePosition(loc.x, loc.y, loc.z, loc.orientation);
+}
+
+void Unit::SendFlightSplineSyncUpdate()
+{
+    if (!movespline->isCyclic() || movespline->Finalized())
+        return;
+
+    WorldPackets::Movement::FlightSplineSync flightSplineSync;
+    flightSplineSync.Guid = GetGUID();
+    flightSplineSync.SplineDist = float(movespline->timePassed()) / movespline->Duration();
+    SendMessageToSet(flightSplineSync.Write(), true);
 }
 
 void Unit::InterruptMovementBasedAuras()
@@ -3051,7 +3071,7 @@ void Unit::FinishSpell(CurrentSpellTypes spellType, SpellCastResult result /*= S
         return;
 
     if (spellType == CURRENT_CHANNELED_SPELL)
-        spell->SendChannelUpdate(0);
+        spell->SendChannelUpdate(0, result);
 
     spell->finish(result);
 }
@@ -3139,6 +3159,9 @@ bool Unit::IsMovementPreventedByCasting() const
 
 bool Unit::CanCastSpellWhileMoving(SpellInfo const* spellInfo) const
 {
+    if (spellInfo->HasAttribute(SPELL_ATTR13_DO_NOT_ALLOW_DISABLE_MOVEMENT_INTERRUPT))
+        return false;
+
     if (HasAuraTypeWithAffectMask(SPELL_AURA_CAST_WHILE_WALKING, spellInfo))
         return true;
 
@@ -5531,12 +5554,43 @@ void Unit::SendAttackStateUpdate(uint32 HitInfo, Unit* target, uint8 /*SwingType
     SendAttackStateUpdate(&dmgInfo);
 }
 
-void Unit::SetPowerType(Powers new_powertype, bool sendUpdate/* = true*/)
+void Unit::SetPowerType(Powers power, bool sendUpdate/* = true*/, bool onInit /*= false*/)
 {
-    if (GetPowerType() == new_powertype)
+    if (!onInit && GetPowerType() == power)
         return;
 
-    SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::DisplayPower), new_powertype);
+    PowerTypeEntry const* powerTypeEntry = sDB2Manager.GetPowerTypeEntry(power);
+    if (!powerTypeEntry)
+        return;
+
+    if (IsCreature() && !powerTypeEntry->GetFlags().HasFlag(PowerTypeFlags::IsUsedByNPCs))
+        return;
+
+    SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::DisplayPower), power);
+
+    // Update max power
+    UpdateMaxPower(power);
+
+    // Update current power
+    if (!onInit)
+    {
+        switch (power)
+        {
+            case POWER_MANA: // Keep the same (druid form switching...)
+            case POWER_ENERGY:
+                break;
+            case POWER_RAGE: // Reset to zero
+                SetPower(POWER_RAGE, 0);
+            break;
+            case POWER_FOCUS: // Make it full
+                SetFullPower(power);
+            break;
+            default:
+                break;
+        }
+    }
+    else
+        SetInitialPowerValue(power);
 
     if (!sendUpdate)
         return;
@@ -5551,25 +5605,18 @@ void Unit::SetPowerType(Powers new_powertype, bool sendUpdate/* = true*/)
         if (pet->isControlled())
             pet->SetGroupUpdateFlag(GROUP_UPDATE_FLAG_PET_POWER_TYPE);
     }*/
+}
 
-    // Update max power
-    UpdateMaxPower(new_powertype);
+void Unit::SetInitialPowerValue(Powers powerType)
+{
+    PowerTypeEntry const* powerTypeEntry = sDB2Manager.GetPowerTypeEntry(powerType);
+    if (!powerTypeEntry)
+        return;
 
-    // Update current power
-    switch (new_powertype)
-    {
-        case POWER_MANA: // Keep the same (druid form switching...)
-        case POWER_ENERGY:
-            break;
-        case POWER_RAGE: // Reset to zero
-            SetPower(POWER_RAGE, 0);
-            break;
-        case POWER_FOCUS: // Make it full
-            SetFullPower(new_powertype);
-            break;
-        default:
-            break;
-    }
+    if (powerTypeEntry->GetFlags().HasFlag(PowerTypeFlags::UnitsUseDefaultPowerOnInit))
+        SetPower(powerType, powerTypeEntry->DefaultPower);
+    else
+        SetFullPower(powerType);
 }
 
 Powers Unit::CalculateDisplayPowerType() const
@@ -5607,13 +5654,8 @@ Powers Unit::CalculateDisplayPowerType() const
                     if (PowerDisplayEntry const* powerDisplay = sPowerDisplayStore.LookupEntry(vehicle->GetVehicleInfo()->PowerDisplayID[0]))
                         displayPower = Powers(powerDisplay->ActualType);
                 }
-                else if (Pet const* pet = ToPet())
-                {
-                    if (pet->getPetType() == HUNTER_PET) // Hunter pets have focus
-                        displayPower = POWER_FOCUS;
-                    else if (pet->IsPetGhoul() || pet->IsPetAbomination()) // DK pets have energy
-                        displayPower = POWER_ENERGY;
-                }
+                else if (IsHunterPet())
+                    displayPower = POWER_FOCUS;
             }
             break;
         }
@@ -12430,10 +12472,6 @@ bool Unit::UpdatePosition(float x, float y, float z, float orientation, bool tel
     if (isInWater)
         RemoveAurasWithInterruptFlags(SpellAuraInterruptFlags2::Swimming);
 
-    // TODO: on heartbeat
-    if (m_vignette)
-        Vignettes::Update(*m_vignette, this);
-
     return (relocated || turn);
 }
 
@@ -12758,16 +12796,6 @@ bool Unit::SetDisableGravity(bool disable, bool updateAnimTier /*= true*/)
         SendMessageToSet(packet.Write(), true);
     }
 
-    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT))
-    {
-        if (IsGravityDisabled())
-            SetAnimTier(AnimTier::Fly);
-        else if (IsHovering())
-            SetAnimTier(AnimTier::Hover);
-        else
-            SetAnimTier(AnimTier::Ground);
-    }
-
     if (IsAlive())
     {
         if (IsGravityDisabled() || IsHovering())
@@ -12777,6 +12805,16 @@ bool Unit::SetDisableGravity(bool disable, bool updateAnimTier /*= true*/)
     }
     else if (IsPlayer()) // To update player who dies while flying/hovering
         SetPlayHoverAnim(false, false);
+
+    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT))
+    {
+        if (IsGravityDisabled())
+            SetAnimTier(AnimTier::Fly);
+        else if (IsHovering())
+            SetAnimTier(AnimTier::Hover);
+        else
+            SetAnimTier(AnimTier::Ground);
+    }
 
     return true;
 }
@@ -12984,16 +13022,6 @@ bool Unit::SetHover(bool enable, bool updateAnimTier /*= true*/)
         SendMessageToSet(packet.Write(), true);
     }
 
-    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT))
-    {
-        if (IsGravityDisabled())
-            SetAnimTier(AnimTier::Fly);
-        else if (IsHovering())
-            SetAnimTier(AnimTier::Hover);
-        else
-            SetAnimTier(AnimTier::Ground);
-    }
-
     if (IsAlive())
     {
         if (IsGravityDisabled() || IsHovering())
@@ -13003,6 +13031,16 @@ bool Unit::SetHover(bool enable, bool updateAnimTier /*= true*/)
     }
     else if (IsPlayer()) // To update player who dies while flying/hovering
         SetPlayHoverAnim(false, false);
+
+    if (IsCreature() && updateAnimTier && IsAlive() && !HasUnitState(UNIT_STATE_ROOT))
+    {
+        if (IsGravityDisabled())
+            SetAnimTier(AnimTier::Fly);
+        else if (IsHovering())
+            SetAnimTier(AnimTier::Hover);
+        else
+            SetAnimTier(AnimTier::Ground);
+    }
 
     return true;
 }

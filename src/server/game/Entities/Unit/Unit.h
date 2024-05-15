@@ -684,6 +684,9 @@ class TC_GAME_API Unit : public WorldObject
 
         virtual void Update(uint32 time) override;
 
+        void Heartbeat() override;
+        void TriggerAuraHeartbeat();
+
         void setAttackTimer(WeaponAttackType type, uint32 time) { m_attackTimer[type] = time; }
         void resetAttackTimer(WeaponAttackType type = BASE_ATTACK);
         uint32 getAttackTimer(WeaponAttackType type) const { return m_attackTimer[type]; }
@@ -797,7 +800,8 @@ class TC_GAME_API Unit : public WorldObject
         virtual float GetArmorMultiplierForTarget(WorldObject const* /*target*/) const { return 1.0f; }
 
         Powers GetPowerType() const { return Powers(*m_unitData->DisplayPower); }
-        void SetPowerType(Powers power, bool sendUpdate = true);
+        void SetPowerType(Powers power, bool sendUpdate = true, bool onInit = false);
+        void SetInitialPowerValue(Powers powerType);
         void SetOverrideDisplayPowerId(uint32 powerDisplayId) { SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::OverrideDisplayPowerID), powerDisplayId); }
         Powers CalculateDisplayPowerType() const;
         void UpdateDisplayPower();
@@ -1425,6 +1429,8 @@ class TC_GAME_API Unit : public WorldObject
                 RemoveDynamicUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::ChannelObjects), index);
         }
         void ClearChannelObjects() { ClearDynamicUpdateFieldValues(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::ChannelObjects)); }
+        int8 GetSpellEmpowerStage() const { return m_unitData->SpellEmpowerStage; }
+        void SetSpellEmpowerStage(int8 stage) { SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::SpellEmpowerStage), stage); }
 
         void SetCurrentCastSpell(Spell* pSpell);
         void InterruptSpell(CurrentSpellTypes spellType, bool withDelayed = true, bool withInstant = true);
@@ -1938,6 +1944,7 @@ class TC_GAME_API Unit : public WorldObject
 
         void UpdateSplineMovement(uint32 t_diff);
         void UpdateSplinePosition();
+        void SendFlightSplineSyncUpdate();
         void InterruptMovementBasedAuras();
 
         // player or player's pet
@@ -1957,7 +1964,6 @@ class TC_GAME_API Unit : public WorldObject
     private:
 
         uint32 m_state;                                     // Even derived shouldn't modify
-        TimeTracker m_splineSyncTimer;
 
         Diminishing m_Diminishing;
 
