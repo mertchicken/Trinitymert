@@ -82,6 +82,7 @@ jobs:
         sort: desc
         owner: TrinityCore
         repo: TrinityCore
+        per_page: 100
         token: ${{ secrets.GITHUB_TOKEN }}
     - name: Download latest DB
       uses: i3h/download-release-asset@a987f9dc3559bd1024d7ed353b59c9d0bbb8ab61
@@ -210,6 +211,7 @@ jobs:
         sort: desc
         owner: TrinityCore
         repo: TrinityCore
+        per_page: 100
         token: ${{ secrets.GITHUB_TOKEN }}
     - name: Download latest DB
       uses: i3h/download-release-asset@a987f9dc3559bd1024d7ed353b59c9d0bbb8ab61
