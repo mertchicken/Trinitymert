@@ -213,6 +213,9 @@ jobs:
         repo: TrinityCore
         per_page: 100
         token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Print matched tags
+      run: |
+        echo ${{ steps.find_matching_tags.outputs.tags }}
     - name: Download latest DB
       uses: i3h/download-release-asset@a987f9dc3559bd1024d7ed353b59c9d0bbb8ab61
       with:
@@ -222,6 +225,9 @@ jobs:
         file: /TDB_full.*\.7z/
         path: bin/check_install/bin
         token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Print downloaded files
+      run: |
+        ls -lah bin/check_install/bin
     - name: Set configs
       run: |
         cd bin/check_install/etc
