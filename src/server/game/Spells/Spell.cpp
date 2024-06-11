@@ -5341,7 +5341,7 @@ void Spell::SendChannelStart(uint32 duration)
 
     m_timer = duration;
 
-    if (!m_targets.HasDst())
+    if (!m_UniqueTargetInfo.empty() || !m_UniqueGOTargetInfo.empty())
     {
         uint32 channelAuraMask = 0;
         uint32 explicitTargetEffectMask = 0xFFFFFFFF;
@@ -5978,6 +5978,22 @@ SpellCastResult Spell::CheckCast(bool strict, int32* param1 /*= nullptr*/, int32
 
             if (unitCaster->IsInCombat() && !m_spellInfo->CanBeUsedInCombat(unitCaster))
                 return SPELL_FAILED_AFFECTING_COMBAT;
+
+            if (m_spellInfo->HasAttribute(SPELL_ATTR9_ONLY_WHEN_ILLEGALLY_MOUNTED))
+            {
+                bool hasInvalidMountAura = std::ranges::any_of(unitCaster->GetAuraEffectsByType(SPELL_AURA_MOUNTED), [unitCaster](AuraEffect const* mountEffect)
+                {
+                    uint32 mountType = mountEffect->GetSpellEffectInfo().MiscValueB;
+                    if (MountEntry const* mountEntry = sDB2Manager.GetMount(mountEffect->GetId()))
+                        mountType = mountEntry->MountTypeID;
+
+                    MountCapabilityEntry const* mountCapability = unitCaster->GetMountCapability(mountType);
+                    return !mountCapability || mountCapability->ID != uint32(mountEffect->GetAmount());
+                });
+
+                if (!hasInvalidMountAura)
+                    return SPELL_FAILED_ONLY_MOUNTED;
+            }
         }
 
         // Check vehicle flags
