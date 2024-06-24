@@ -7201,7 +7201,7 @@ void ObjectMgr::LoadAreaTriggerPolygons()
 {
     for (AreaTriggerEntry const* areaTrigger : sAreaTriggerStore)
     {
-        if (areaTrigger->ShapeType != 3)
+        if (areaTrigger->GetShapeType() != AreaTriggerShapeType::Polygon)
             continue;
 
         PathDb2 const* path = sDB2Manager.GetPath(areaTrigger->ShapeID);
@@ -8905,6 +8905,15 @@ void ObjectMgr::LoadGameObjectForQuests()
         }
 
         _gameObjectForQuestStore.insert(gameObjectTemplatePair.first);
+        ++count;
+    }
+
+    for (auto [questObjectiveId, objective] : _questObjectives)
+    {
+        if (objective->Type != QUEST_OBJECTIVE_GAMEOBJECT)
+            continue;
+
+        _gameObjectForQuestStore.insert(objective->ObjectID);
         ++count;
     }
 
