@@ -164,6 +164,13 @@ typedef std::unordered_map<uint32, PlayerTalent*> PlayerTalentMap;
 typedef std::unordered_map<uint32, PlayerSpell> PlayerSpellMap;
 typedef std::unordered_set<SpellModifier*> SpellModContainer;
 
+struct ReforgeData
+{
+    uint32 increase, decrease;
+    int32 stat_value;
+};
+typedef std::unordered_map<uint32, ReforgeData> ReforgeMapType;
+
 enum ActionButtonUpdateState
 {
     ACTIONBUTTON_UNCHANGED = 0,
@@ -2205,6 +2212,8 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
         BasicEvent* pendingTransmogCheck = nullptr;
         AppearanceContainer transmogrification_appearances;
         PresetMapType presetMap;
+        ReforgeMapType reforgeMap; // reforgeMap[iGUID] = ReforgeData
+
         std::string GetDebugInfo() const override;
 
     protected:
