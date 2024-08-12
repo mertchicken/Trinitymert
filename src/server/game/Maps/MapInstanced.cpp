@@ -30,6 +30,10 @@
 #include "VMapManager2.h"
 #include "World.h"
 
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
+
 MapInstanced::MapInstanced(uint32 id, time_t expiry) : Map(id, expiry, 0, DUNGEON_DIFFICULTY_NORMAL)
 {
     // fill with zero
@@ -272,6 +276,12 @@ BattlegroundMap* MapInstanced::CreateBattleground(uint32 InstanceId, Battlegroun
     map->SetWeakPtr(ptr);
 
     sScriptMgr->OnCreateMap(map);
+
+#ifdef ELUNA
+    if(Eluna* e = map->GetEluna())
+        e->OnBGCreate(bg, bg->GetTypeID(), bg->GetInstanceID());
+#endif
+
     return map;
 }
 
