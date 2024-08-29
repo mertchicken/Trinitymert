@@ -857,6 +857,10 @@ void BotDataMgr::LoadNpcBots(bool spawn)
 
         TC_LOG_INFO("server.loading", ">> Loaded {} bot data entries", datacounter);
 
+        if (!spawn)
+        {
+            TC_LOG_INFO("server.loading", "Bot spawning is disabled (spawn = false). Bots will not be spawned.");
+        }
         if (spawn)
         {
             for (std::list<uint32>::const_iterator itr = entryList.cbegin(); itr != entryList.cend(); ++itr)
@@ -993,7 +997,8 @@ void BotDataMgr::LoadNpcBotGearStorage()
 
         Item* item = new Item();
         ObjectGuid player_guid = ObjectGuid::Create<HighGuid::Player>(player_guidlow);
-        ASSERT(item->LoadFromDB(item_guidlow, player_guid, fields, item_id), "LoadNpcBotGearStorage(): unable to load item %u id %u! Owner: %s", item_guidlow, item_id, player_guid.ToString().c_str());
+        //ASSERT(item->LoadFromDB(item_guidlow, player_guid, fields, item_id), "LoadNpcBotGearStorage(): unable to load item %u id %u! Owner: %s", item_guidlow, item_id, player_guid.ToString().c_str());
+        ASSERT(item->NPCBotLoadFromDB(item_guidlow, player_guid, fields, item_id), "LoadNpcBotGearStorage(): unable to load item %u id %u! Owner: %s", item_guidlow, item_id, player_guid.ToString().c_str());
 
         _botStoredGearMap[player_guid].insert(item);
         player_guids.insert(player_guidlow);
@@ -2442,6 +2447,8 @@ void BotDataMgr::UpdateNpcBotData(uint32 entry, NpcBotDataUpdateType updateType,
                     stmt->setUInt16(++index, botitem->GetUInt32Value(ITEM_FIELD_DURABILITY));
                     stmt->setUInt32(++index, botitem->GetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME));
                     stmt->setString(++index, botitem->GetText());
+                    stmt->setUInt32(++index, 0);  // Set the transmog field to 0
+                    stmt->setUInt32(++index, 0);  // Set the enchant field to 0
                     stmt->setUInt32(++index, botitem->GetGUID().GetCounter());
 
                     trans->Append(stmt);
@@ -2458,7 +2465,8 @@ void BotDataMgr::UpdateNpcBotData(uint32 entry, NpcBotDataUpdateType updateType,
             trans->Append(bstmt);
             CharacterDatabase.CommitTransaction(trans);
             break;
-        }
+        }       
+  
         case NPCBOT_UPDATE_ERASE:
         {
             NpcBotDataMap::iterator bitr = _botsData.find(entry);

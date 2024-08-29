@@ -526,7 +526,7 @@ void bot_ai::CheckOwnerExpiry()
 
             do
             {
-                Field* fields2 = iiresult->Fetch();
+                Field* fields2 = iiresult->Fetch();               
                 uint32 itemGuidLow = fields2[11].GetUInt32();
                 uint32 itemId = fields2[12].GetUInt32();
                 uint8 item_idx = std::numeric_limits<uint8>::max();
@@ -10291,6 +10291,8 @@ bool bot_ai::OnGossipSelect(Player* player, Creature* creature/* == me*/, uint32
             BotMgr* mgr = player->GetBotMgr();
             ASSERT(mgr);
 
+            //skip the send items to owner
+            /*
             //send items to owner -- Unequip all
             bool abort = false;
             for (uint8 i = BOT_SLOT_MAINHAND; i != BOT_INVENTORY_SIZE; ++i)
@@ -10307,6 +10309,7 @@ bool bot_ai::OnGossipSelect(Player* player, Creature* creature/* == me*/, uint32
 
             if (abort)
                 break;
+            */
 
             mgr->RemoveBot(me->GetGUID(), BOT_REMOVE_DISMISS);
             if (BotMgr::IsEnrageOnDimissEnabled())
@@ -14667,6 +14670,8 @@ bool bot_ai::IsValidSpecForClass(uint8 m_class, uint8 spec)
 
 void bot_ai::InitEquips()
 {
+    TC_LOG_INFO("npcbots", "Entering bot_ai::InitEquips for bot ID: {}, Name: {}", me->GetEntry(), me->GetName());
+
     EquipmentInfo const* einfo = BotDataMgr::GetBotEquipmentInfo(me->GetEntry());
     ASSERT(einfo, "Trying to spawn bot with no equip info!");
 
@@ -14675,6 +14680,8 @@ void bot_ai::InitEquips()
 
     if (IsWanderer())
     {
+        TC_LOG_INFO("npcbots", "Bot {} is a Wanderer. Generating random equipment.", me->GetName());
+
         GenerateRand();
         uint8 lvl = me->GetLevel();
         std::ostringstream gss;
@@ -14949,6 +14956,7 @@ void bot_ai::InitEquips()
     }
     else
     {
+        TC_LOG_INFO("npcbots", "Bot {} is not a Wanderer. Attempting to load equipment from the database.", me->GetName());
         CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_NPCBOT_EQUIP_BY_ITEM_INSTANCE);
         //        0            1                2      3         4        5      6             7                 8           9           10    11    12         13
         //"SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, playedTime, text, guid, itemEntry, owner_guid "
@@ -14965,6 +14973,7 @@ void bot_ai::InitEquips()
 
         if (!iiresult) //blank bot - fill with standard items
         {
+            TC_LOG_INFO("npcbots", "No equipment found in the database for bot {}. Using standard items.", me->GetName());
             for (uint8 i = 0; i != MAX_EQUIPMENT_ITEMS; ++i)
             {
                 uint32 itemId = einfo->ItemEntry[i];
@@ -14978,6 +14987,8 @@ void bot_ai::InitEquips()
         }
         else
         {
+            TC_LOG_INFO("npcbots", "Equipment found in the database for bot {}. Loading items.", me->GetName());
+
             Field* fields2;
             do
             {
@@ -14985,7 +14996,11 @@ void bot_ai::InitEquips()
                 uint32 itemGuidLow = fields2[11].GetUInt32();
                 uint32 itemId = fields2[12].GetUInt32();
                 Item* item = new Item;
-                ASSERT(item->LoadFromDB(itemGuidLow, ObjectGuid::Empty, fields2, itemId));
+                               
+                TC_LOG_INFO("npcbots", "Attempting to load item with GUID: {}, ItemID: {}", itemGuidLow, itemId);                           
+                //ASSERT(item->LoadFromDB(itemGuidLow, ObjectGuid::Empty, fields2, itemId));
+                ASSERT(item->NPCBotLoadFromDB(itemGuidLow, ObjectGuid::Empty, fields2, itemId));
+
                 //gonna find where to store our new item
                 bool found = false;
                 for (uint8 i = BOT_SLOT_MAINHAND; i != BOT_INVENTORY_SIZE; ++i)

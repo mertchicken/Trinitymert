@@ -508,6 +508,100 @@ bool Item::LoadFromDB(ObjectGuid::LowType guid, ObjectGuid owner_guid, Field* fi
     return true;
 }
 
+bool Item::NPCBotLoadFromDB(ObjectGuid::LowType guid, ObjectGuid owner_guid, Field* fields, uint32 entry)
+{
+    //                                                    0                1      2         3        4      5             6                 7           8           9    10
+    //result = CharacterDatabase.PQuery("SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, playedTime, text FROM item_instance WHERE guid = '{}'", guid);
+
+    // create item before any checks for store correct guid
+    // and allow use "FSetState(ITEM_REMOVED); SaveToDB();" for deleting item from DB
+    Object::_Create(guid, 0, HighGuid::Item);
+
+    // Set entry, MUST be before proto check
+    SetEntry(entry);
+    SetObjectScale(1.0f);
+
+    ItemTemplate const* proto = GetTemplate();
+    if (!proto)
+    {
+        TC_LOG_ERROR("entities.item", "Invalid entry {} for item {}. Refusing to load.", GetEntry(), GetGUID().ToString());
+        return false;
+    }
+
+    // set owner (not if item is only loaded for gbank/auction/mail
+    if (owner_guid)
+        SetOwnerGUID(owner_guid);
+
+    bool need_save = false;                                 // need explicit save data at load fixes
+    SetGuidValue(ITEM_FIELD_CREATOR, ObjectGuid(HighGuid::Player, fields[0].GetUInt32()));
+    SetGuidValue(ITEM_FIELD_GIFTCREATOR, ObjectGuid(HighGuid::Player, fields[1].GetUInt32()));
+    SetCount(fields[2].GetUInt32());
+
+    uint32 duration = fields[3].GetUInt32();
+    SetUInt32Value(ITEM_FIELD_DURATION, duration);
+    // update duration if need, and remove if not need
+    if ((proto->Duration == 0) != (duration == 0))
+    {
+        SetUInt32Value(ITEM_FIELD_DURATION, proto->Duration);
+        need_save = true;
+    }
+
+    std::vector<std::string_view> tokens = Trinity::Tokenize(fields[4].GetStringView(), ' ', false);
+    if (tokens.size() == MAX_ITEM_PROTO_SPELLS)
+    {
+        for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
+        {
+            if (Optional<int32> charges = Trinity::StringTo<int32>(tokens[i]))
+                SetSpellCharges(i, *charges);
+            else
+                TC_LOG_ERROR("entities.item", "Invalid charge info '{}' for item {}, charge data not loaded.", std::string(tokens[i]), GetGUID().ToString());
+        }
+    }
+
+    SetUInt32Value(ITEM_FIELD_FLAGS, fields[5].GetUInt32());
+    // Remove bind flag for items vs NO_BIND set
+    if (IsSoulBound() && proto->Bonding == NO_BIND)
+    {
+        ApplyModFlag(ITEM_FIELD_FLAGS, ITEM_FIELD_FLAG_SOULBOUND, false);
+        need_save = true;
+    }
+
+    if (!_LoadIntoDataField(fields[6].GetString(), ITEM_FIELD_ENCHANTMENT_1_1, MAX_ENCHANTMENT_SLOT * MAX_ENCHANTMENT_OFFSET))
+        TC_LOG_WARN("entities.item", "Invalid enchantment data '{}' for item {}. Forcing partial load.", fields[6].GetString(), GetGUID().ToString());
+
+    SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, fields[7].GetInt16());
+    // recalculate suffix factor
+    if (GetItemRandomPropertyId() < 0)
+        UpdateItemSuffixFactor();
+
+    uint32 durability = fields[8].GetUInt16();
+    SetUInt32Value(ITEM_FIELD_DURABILITY, durability);
+    // update max durability (and durability) if need
+    SetUInt32Value(ITEM_FIELD_MAXDURABILITY, proto->MaxDurability);
+
+    // do not overwrite durability for wrapped items
+    if (durability > proto->MaxDurability && !IsWrapped())
+    {
+        SetUInt32Value(ITEM_FIELD_DURABILITY, proto->MaxDurability);
+        need_save = true;
+    }
+
+    SetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME, fields[9].GetUInt32());
+    SetText(fields[10].GetString());
+
+    if (need_save)                                           // normal item changed state set not work at loading
+    {
+        CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ITEM_INSTANCE_ON_LOAD);
+        stmt->setUInt32(0, GetUInt32Value(ITEM_FIELD_DURATION));
+        stmt->setUInt32(1, GetUInt32Value(ITEM_FIELD_FLAGS));
+        stmt->setUInt32(2, GetUInt32Value(ITEM_FIELD_DURABILITY));
+        stmt->setUInt32(3, guid);
+        CharacterDatabase.Execute(stmt);
+    }
+
+    return true;
+}
+
 /*static*/
 void Item::DeleteFromDB(CharacterDatabaseTransaction trans, ObjectGuid::LowType itemGuid)
 {
